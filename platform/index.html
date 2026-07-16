@@ -304,7 +304,7 @@ function render(){
     const g = gradeOf(v, th);
     // 원 크기는 통일하고 사용량은 색상으로만 구분
     const circle = new kakao.maps.Circle({
-      center:new kakao.maps.LatLng(c.lat,c.lng), radius:22,
+      center:new kakao.maps.LatLng(c.lat,c.lng), radius:11,
       strokeWeight:1, strokeColor:GRADES[g], strokeOpacity:.9,
       fillColor:GRADES[g], fillOpacity:.45, map
     });
@@ -320,7 +320,7 @@ function render(){
     const c = coords[b.addr];
     if (!c) return;
     const circle = new kakao.maps.Circle({
-      center:new kakao.maps.LatLng(c.lat,c.lng), radius:22,
+      center:new kakao.maps.LatLng(c.lat,c.lng), radius:11,
       strokeWeight:1, strokeColor:'#6b7280', strokeOpacity:.8,
       fillColor:'#9ca3af', fillOpacity:.5, map
     });
