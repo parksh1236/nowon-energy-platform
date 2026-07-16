@@ -150,6 +150,8 @@ const CACHE_KEY = 'nowon_geocode_v1';                    // 좌표 캐시(localS
 let DATA = null;          // data.json 내용
 let map = null;           // 카카오 지도 객체
 let geocoder = null;      // 주소→좌표 변환기
+let places = null;        // 카카오 장소(키워드) 검색 서비스
+let searchMarker = null;  // 카카오 장소 검색 결과 임시 마커
 let coords = {};          // 주소 → {lat,lng}
 let overlays = [];        // 지도에 그려진 원(Circle) 목록
 let state = { energy:'elec', month:'', usages:new Set() };  // 현재 필터 상태 (usages: 선택된 용도 집합)
@@ -171,7 +173,7 @@ fetch('data.json').then(r=>r.json()).then(d=>{
 function loadKakao(){
   const s = document.createElement('script');
   s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_KEY}&libraries=services&autoload=false`;
-  s.onload = () => kakao.maps.load(initMap);
+  s.onload = () => kakao.maps.load(()=>{ initMap(); places = new kakao.maps.services.Places(); });
   s.onerror = () => {
     document.getElementById('curOrigin').textContent = location.origin;  // 현재 접속 도메인 표시
     document.getElementById('sdkerr').style.display='flex';
@@ -471,29 +473,76 @@ function initSearch(){
   const box = document.getElementById('searchBox');
   const res = document.getElementById('searchResults');
 
-  box.oninput = ()=>{
-    const q = box.value.trim().toLowerCase();
-    if (q.length < 2){ res.style.display='none'; return; }   // 2글자부터 검색
-    // 주소/건물명/도로명에 검색어가 포함된 건물 찾기 (최대 10건)
-    const hits = [];
-    for (const b of DATA.buildings){
-      const hay = `${b.addr} ${b.name||''} ${b.road||''}`.toLowerCase();
-      if (hay.includes(q)){
-        hits.push(b);
-        if (hits.length >= 10) break;
-      }
+  let debounce = null;   // 카카오 호출 과다 방지용 타이머
+
+  // 결과 목록을 화면에 그리고 클릭 이벤트 연결
+  function renderResults(localHits, kakaoHits){
+    let html = '';
+    if (localHits.length){
+      html += '<div class="sr" style="color:#9db3cc;cursor:default">📊 데이터 내 건물</div>';
+      html += localHits.map(b=>`
+        <div class="sr" data-addr="${b.addr.replace(/"/g,'&quot;')}">
+          ${b.name?`<b>${b.name}</b> · `:''}${b.addr.replace('서울특별시 노원구 ','')}
+          <div class="sub2">${b.usage||'용도정보 없음'}${b.road?' · '+b.road.replace('서울특별시 노원구 ',''):''}</div>
+        </div>`).join('');
     }
-    if (!hits.length){ res.innerHTML='<div class="sr">검색 결과 없음</div>'; res.style.display='block'; return; }
-    res.innerHTML = hits.map(b=>`
-      <div class="sr" data-addr="${b.addr.replace(/"/g,'&quot;')}">
-        ${b.name?`<b>${b.name}</b> · `:''}${b.addr.replace('서울특별시 노원구 ','')}
-        <div class="sub2">${b.usage||'용도정보 없음'}${b.road?' · '+b.road.replace('서울특별시 노원구 ',''):''}</div>
-      </div>`).join('');
+    if (kakaoHits.length){
+      html += '<div class="sr" style="color:#9db3cc;cursor:default">🗺️ 카카오 장소 검색</div>';
+      html += kakaoHits.map((p,i)=>`
+        <div class="sr" data-kakao="${i}">
+          <b>${p.place_name}</b>
+          <div class="sub2">${p.address_name}${p.category_group_name?' · '+p.category_group_name:''}</div>
+        </div>`).join('');
+    }
+    if (!html) html = '<div class="sr">검색 결과 없음</div>';
+    res.innerHTML = html;
     res.style.display='block';
-    // 결과 클릭 → 지도 이동 + 상세 패널
     res.querySelectorAll('.sr[data-addr]').forEach(el=>{
       el.onclick = ()=>{ focusBuilding(el.dataset.addr); res.style.display='none'; };
     });
+    res.querySelectorAll('.sr[data-kakao]').forEach(el=>{
+      el.onclick = ()=>{ goKakaoPlace(kakaoHits[+el.dataset.kakao]); res.style.display='none'; };
+    });
+  }
+
+  // 카카오 장소 결과 클릭: 우리 데이터와 주소 매칭 시도 → 있으면 상세, 없으면 위치 표시
+  function goKakaoPlace(p){
+    // 카카오 주소 '서울 노원구 …' → 우리 형식 '서울특별시 노원구 …' 로 정규화
+    const addr = (p.address_name||'').replace(/^서울\s/, '서울특별시 ').trim();
+    const b = DATA.buildings.find(x=>x.addr===addr);
+    if (searchMarker) searchMarker.setMap(null);            // 이전 임시 마커 제거
+    if (b && coords[b.addr]){ focusBuilding(b.addr); return; }
+    // 데이터에 없는 장소: 지도 이동 + 임시 마커만 표시
+    const pos = new kakao.maps.LatLng(+p.y, +p.x);
+    map.setLevel(4); map.panTo(pos);
+    searchMarker = new kakao.maps.Marker({ map, position:pos, title:p.place_name });
+  }
+
+  box.oninput = ()=>{
+    const q = box.value.trim();
+    if (q.length < 2){ res.style.display='none'; return; }   // 2글자부터 검색
+    // 1) 우리 데이터에서 주소/건물명/도로명 검색 (최대 7건)
+    const ql = q.toLowerCase();
+    const hits = [];
+    for (const b of DATA.buildings){
+      const hay = `${b.addr} ${b.name||''} ${b.road||''}`.toLowerCase();
+      if (hay.includes(ql)){
+        hits.push(b);
+        if (hits.length >= 7) break;
+      }
+    }
+    renderResults(hits, []);
+    // 2) 카카오 장소 검색 병행 (0.3초 디바운스, 노원구 내 결과만)
+    clearTimeout(debounce);
+    debounce = setTimeout(()=>{
+      if (!places) return;
+      places.keywordSearch(q, (data, status)=>{
+        if (box.value.trim() !== q) return;                  // 입력이 바뀌었으면 무시
+        const kakaoHits = (status===kakao.maps.services.Status.OK ? data : [])
+          .filter(p=>p.address_name && p.address_name.includes('노원구')).slice(0,5);
+        renderResults(hits, kakaoHits);
+      }, { location: new kakao.maps.LatLng(37.6543, 127.0568), radius: 7000 });
+    }, 300);
   };
   // 검색창 밖 클릭 시 결과 닫기
   document.addEventListener('click', e=>{

@@ -41,7 +41,8 @@
       "Bash(git commit -m '지도 확대/축소 컨트롤 + 노원구 경계선 표시 *)",
       "Bash(git commit -m '건축물 용도 필터를 체크박스 다중 선택으로 변경 *)",
       "Bash(git commit -m '주소·건물명 검색 기능 추가 *)",
-      "Bash(echo pushed *)"
+      "Bash(echo pushed *)",
+      "Bash(git commit -m '카카오 장소검색 연동으로 검색 강화 \\(시설명→데이터 자동 매칭\\) *)"
     ]
   }
 }
