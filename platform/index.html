@@ -120,6 +120,9 @@
       <div class="cnt" id="cntInfo"></div>
     </div>
     <div id="stats"></div>
+    <div style="padding:8px 18px; border-top:1px solid rgba(255,255,255,.12)">
+      <button id="exportCoords" class="mini" style="float:none">📥 좌표 캐시 내보내기 (coords.json)</button>
+    </div>
   </aside>
 
   <!-- 지도 -->
@@ -586,6 +589,18 @@ function showDetail(b){
   document.getElementById('detail').style.display='block';
 }
 document.getElementById('dclose').onclick = ()=>document.getElementById('detail').style.display='none';
+
+// ── 9) 좌표 캐시 내보내기 ─────────────────────────────
+// 새 주소 지오코딩 후 이 버튼으로 coords.json을 내려받아
+// platform/coords.json에 덮어쓰고 git push 하면 다른 방문자도 재변환 없이 사용
+document.getElementById('exportCoords').onclick = ()=>{
+  const blob = new Blob([JSON.stringify(coords)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'coords.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
 </script>
 </body>
 </html>
