@@ -66,6 +66,15 @@
   #sdkerr h2 { font-size:18px; margin-bottom:10px; color:#c0392b; }
   #sdkerr code { background:#eef2f7; padding:2px 6px; border-radius:4px; font-size:13px; }
   .cnt { font-size:11px; color:#9db3cc; margin-top:2px; }
+
+  /* ── 용도 체크박스 목록 ─────────────────────── */
+  #usageList { max-height:180px; overflow-y:auto; border:1px solid rgba(255,255,255,.2); border-radius:6px; padding:6px 8px; background:#16304f; }
+  #usageList label { display:flex; align-items:center; gap:6px; font-size:12px; color:#e8eef5; padding:2.5px 0; cursor:pointer; }
+  #usageList label:hover { color:#4fd1a5; }
+  #usageList input { accent-color:#4fd1a5; }
+  #usageList .uc { color:#9db3cc; font-size:11px; margin-left:auto; }
+  .mini { float:right; font-size:10.5px; padding:1px 7px; border:1px solid rgba(255,255,255,.3); background:transparent; color:#9db3cc; border-radius:10px; cursor:pointer; }
+  .mini:hover { color:#4fd1a5; border-color:#4fd1a5; }
 </style>
 </head>
 <body>
@@ -91,8 +100,8 @@
       </div>
     </div>
     <div class="ctrl">
-      <label class="t">건축물 용도</label>
-      <select id="selUsage"><option value="">전체 용도</option></select>
+      <label class="t">건축물 용도 <button id="usageAll" class="mini">전체 선택/해제</button></label>
+      <div id="usageList"></div>
       <div class="cnt" id="cntInfo"></div>
     </div>
     <div id="stats"></div>
@@ -128,7 +137,7 @@ let map = null;           // 카카오 지도 객체
 let geocoder = null;      // 주소→좌표 변환기
 let coords = {};          // 주소 → {lat,lng}
 let overlays = [];        // 지도에 그려진 원(Circle) 목록
-let state = { energy:'elec', month:'', usage:'' };  // 현재 필터 상태
+let state = { energy:'elec', month:'', usages:new Set() };  // 현재 필터 상태 (usages: 선택된 용도 집합)
 
 const fmt = n => Math.round(n).toLocaleString('ko-KR');
 const ymLabel = ym => ym.slice(0,4) + '.' + ym.slice(4);
@@ -259,19 +268,39 @@ function buildMonthButtons(){
 function setSeg(seg,btn){ seg.querySelectorAll('button').forEach(x=>x.classList.remove('on')); btn.classList.add('on'); }
 
 function buildUsageSelect(){
-  // 용도별 건물 수를 세어 많은 순으로 드롭다운 구성
+  // 용도별 건물 수를 세어 많은 순으로 체크박스 목록 구성 (기본: 전체 선택)
   const cnt = {};
-  DATA.buildings.forEach(b=>{ if(b.usage) cnt[b.usage]=(cnt[b.usage]||0)+1; });
-  const sel = document.getElementById('selUsage');
-  Object.entries(cnt).sort((a,b)=>b[1]-a[1]).forEach(([u,c])=>{
-    const o = document.createElement('option');
-    o.value=u; o.textContent=`${u} (${c})`;
-    sel.appendChild(o);
+  let none = 0;
+  DATA.buildings.forEach(b=>{
+    if (b.usage) cnt[b.usage]=(cnt[b.usage]||0)+1;
+    else none++;
   });
-  const oNone = document.createElement('option');
-  oNone.value='__none__'; oNone.textContent='용도정보 없음';
-  sel.appendChild(oNone);
-  sel.onchange = ()=>{ state.usage=sel.value; render(); };
+  const entries = Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+  entries.push(['__none__', none]);                 // 용도정보 없음 항목
+
+  const list = document.getElementById('usageList');
+  entries.forEach(([u,c])=>{
+    state.usages.add(u);                            // 기본값: 모두 선택
+    const lb = document.createElement('label');
+    lb.innerHTML = `<input type="checkbox" checked value="${u}">
+      <span>${u==='__none__'?'용도정보 없음':u}</span><span class="uc">${c}</span>`;
+    lb.querySelector('input').onchange = e=>{
+      e.target.checked ? state.usages.add(u) : state.usages.delete(u);
+      render();
+    };
+    list.appendChild(lb);
+  });
+
+  // 전체 선택/해제 토글 버튼
+  document.getElementById('usageAll').onclick = ()=>{
+    const boxes = [...list.querySelectorAll('input')];
+    const turnOn = boxes.some(x=>!x.checked);       // 하나라도 꺼져 있으면 전체 켬
+    boxes.forEach(x=>{
+      x.checked = turnOn;
+      turnOn ? state.usages.add(x.value) : state.usages.delete(x.value);
+    });
+    render();
+  };
 }
 
 // ── 5) 현재 필터에 맞는 건물 목록 ─────────────────────
@@ -289,11 +318,9 @@ function usageOf(b){
 function periodLabel(){
   return state.month.length===4 ? state.month+'년 전체' : ymLabel(state.month);
 }
-// 용도 필터 통과 여부
+// 용도 필터 통과 여부 (체크된 용도만 표시)
 function passUsage(b){
-  if (state.usage==='__none__') return !b.usage;
-  if (state.usage && b.usage!==state.usage) return false;
-  return true;
+  return state.usages.has(b.usage || '__none__');
 }
 // 사용량 있는 건물 (색상 마커 대상)
 function filtered(){

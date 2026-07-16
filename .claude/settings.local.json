@@ -38,7 +38,8 @@
       "Bash(git commit -m '2024년 1~12월 전기·가스 데이터 반영 \\(27개월로 확장\\) *)",
       "Bash(git commit -m '일반건축물대장 표제부 매칭: 주용도 683→3,483개소, 건물명 표시 *)",
       "Bash(curl -sL \"https://raw.githubusercontent.com/southkorea/seoul-maps/master/juso/2015/json/seoul_municipalities_geo_simple.json\" -o seoul.json)",
-      "Bash(git commit -m '지도 확대/축소 컨트롤 + 노원구 경계선 표시 *)"
+      "Bash(git commit -m '지도 확대/축소 컨트롤 + 노원구 경계선 표시 *)",
+      "Bash(git commit -m '건축물 용도 필터를 체크박스 다중 선택으로 변경 *)"
     ]
   }
 }
