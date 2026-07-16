@@ -30,7 +30,8 @@
       "Bash(curl -s https://parksh1236.github.io/nowon-energy-platform/platform/)",
       "Bash(git commit -m '상계동 전기사용량 추가 반영 + 파일 간 중복 레코드 제거 로직 *)",
       "Bash(git commit -m '마커 원 크기 통일 \\(사용량 구분은 색상만\\) *)",
-      "Bash(git commit -m '하계·중계·월계동 전기/가스 및 상계동 12월 전기 데이터 반영 *)"
+      "Bash(git commit -m '하계·중계·월계동 전기/가스 및 상계동 12월 전기 데이터 반영 *)",
+      "Bash(git commit -m '공릉동 가스 원본 파일 추가 \\(기존 자료와 동일, 집계 변화 없음\\) *)"
     ]
   }
 }
