@@ -107,7 +107,7 @@
       <h2>카카오지도를 불러올 수 없습니다</h2>
       카카오 개발자 콘솔(<code>developers.kakao.com</code>)에서 이 앱의<br>
       <b>[앱 설정 → 플랫폼 → Web]</b> 에 아래 도메인을 등록해 주세요.<br><br>
-      <code>http://localhost:8000</code><br><br>
+      <code id="curOrigin">http://localhost:8000</code><br><br>
       등록 후 이 페이지를 새로고침하면 지도가 표시됩니다.
     </div></div>
   </div>
@@ -144,7 +144,10 @@ function loadKakao(){
   const s = document.createElement('script');
   s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_KEY}&libraries=services&autoload=false`;
   s.onload = () => kakao.maps.load(initMap);
-  s.onerror = () => document.getElementById('sdkerr').style.display='flex';
+  s.onerror = () => {
+    document.getElementById('curOrigin').textContent = location.origin;  // 현재 접속 도메인 표시
+    document.getElementById('sdkerr').style.display='flex';
+  };
   document.head.appendChild(s);
 }
 

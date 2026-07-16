@@ -15,7 +15,14 @@
       "Bash(git ls-remote *)",
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git commit -m '노원구 에너지정보플랫폼: 데이터 통합 + 카카오맵 시각화 *)"
+      "Bash(git commit -m '노원구 에너지정보플랫폼: 데이터 통합 + 카카오맵 시각화 *)",
+      "Bash(ls -ld /Users/psh/.config /Users/psh/.config/* 2>/dev/null; gh auth status 2>&1 | head -5)",
+      "Bash(GH_CONFIG_DIR=/Users/psh/.gh-config gh auth login --hostname github.com --git-protocol https --web)",
+      "Bash(export GH_CONFIG_DIR=/Users/psh/.gh-config)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(git commit -m '지도 오류 안내에 현재 접속 도메인 자동 표시 *)",
+      "Bash(git push *)"
     ]
   }
 }
