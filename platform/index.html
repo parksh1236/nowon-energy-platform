@@ -74,7 +74,7 @@
   <aside id="sidebar">
     <div class="hd">
       <h1>노원구 <span>에너지정보플랫폼</span></h1>
-      <p>건물 총괄표제부 × 전기·가스 사용량 (2025.12 ~ 2026.03)</p>
+      <p>건물 총괄표제부 × 전기·가스 사용량 (2025.01 ~ 2026.03)</p>
     </div>
     <div class="ctrl">
       <label class="t">에너지 종류</label>
@@ -212,9 +212,12 @@ function buildMonthButtons(){
     selY.appendChild(o);
   });
 
-  // 선택된 연도에 해당하는 월 옵션 채우기
+  // 선택된 연도에 해당하는 월 옵션 채우기 (+ 연간 전체 옵션)
   function fillMonths(year, keep){
     selM.innerHTML='';
+    const oAll = document.createElement('option');       // 연간 합계 옵션
+    oAll.value = year; oAll.textContent = '전체 (연간 합계)';
+    selM.appendChild(oAll);
     DATA.months.filter(m=>m.startsWith(year)).forEach(m=>{
       const o = document.createElement('option');
       o.value=m; o.textContent=parseInt(m.slice(4))+'월';
@@ -254,6 +257,20 @@ function buildUsageSelect(){
 }
 
 // ── 5) 현재 필터에 맞는 건물 목록 ─────────────────────
+// 현재 선택 기간의 사용량 (월: 해당 월 값 / 연도(4자리): 그 해 전체 합계)
+function usageOf(b){
+  const obj = b[state.energy];
+  if (state.month.length === 4){                 // '2025' 같은 연간 선택
+    let s = 0;
+    for (const m in obj) if (m.startsWith(state.month)) s += obj[m];
+    return s || undefined;                       // 0이면 데이터 없음 취급
+  }
+  return obj[state.month];
+}
+// 기간 라벨 ('2025.03' 또는 '2025년 전체')
+function periodLabel(){
+  return state.month.length===4 ? state.month+'년 전체' : ymLabel(state.month);
+}
 // 용도 필터 통과 여부
 function passUsage(b){
   if (state.usage==='__none__') return !b.usage;
@@ -263,15 +280,15 @@ function passUsage(b){
 // 사용량 있는 건물 (색상 마커 대상)
 function filtered(){
   return DATA.buildings.filter(b=>{
-    const v = b[state.energy][state.month];
-    if (v===undefined || v===0) return false;   // 해당 월 사용량 없는 건물 제외
+    const v = usageOf(b);
+    if (v===undefined || v===0) return false;   // 해당 기간 사용량 없는 건물 제외
     return passUsage(b);
   });
 }
 // 사용량은 없지만 용도정보(표제부)가 있는 건물 (회색 마커 대상)
 function noDataBuildings(){
   return DATA.buildings.filter(b=>{
-    const v = b[state.energy][state.month];
+    const v = usageOf(b);
     if (v!==undefined && v!==0) return false;   // 사용량 있으면 색상 마커에서 처리
     if (!b.usage) return false;                 // 표제부 정보도 없으면 제외
     return passUsage(b);
@@ -291,7 +308,7 @@ function render(){
   overlays.forEach(o=>o.setMap(null)); overlays=[];   // 기존 표시 제거
 
   const list = filtered();
-  const vals = list.map(b=>b[state.energy][state.month]).sort((a,b)=>a-b);
+  const vals = list.map(b=>usageOf(b)).sort((a,b)=>a-b);
   // 5분위 기준값 계산 (분포에 따른 등급 색상)
   const q = p => vals.length ? vals[Math.min(vals.length-1, Math.floor(vals.length*p))] : 0;
   const th = [q(.2), q(.4), q(.6), q(.8)];
@@ -300,7 +317,7 @@ function render(){
   list.forEach(b=>{
     const c = coords[b.addr];
     if (!c) return;
-    const v = b[state.energy][state.month];
+    const v = usageOf(b);
     const g = gradeOf(v, th);
     // 원 크기는 통일하고 사용량은 색상으로만 구분
     const circle = new kakao.maps.Circle({
@@ -339,7 +356,7 @@ function renderLegend(th){
   const unit = state.energy==='elec'?'kWh':'MJ';
   const lbs = [`~ ${fmt(th[0])}`, `~ ${fmt(th[1])}`, `~ ${fmt(th[2])}`, `~ ${fmt(th[3])}`, `${fmt(th[3])} ~`];
   document.getElementById('legend').innerHTML =
-    `<b>${ymLabel(state.month)} ${state.energy==='elec'?'전기':'가스'} 사용량 (${unit})</b>` +
+    `<b>${periodLabel()} ${state.energy==='elec'?'전기':'가스'} 사용량 (${unit})</b>` +
     GRADES.map((c,i)=>`<div class="g"><span class="dot" style="background:${c}"></span>${lbs[i]}</div>`).join('') +
     `<div class="g"><span class="dot" style="background:#9ca3af"></span>사용량 정보 없음 (표제부만)</div>`;
 }
@@ -348,24 +365,24 @@ function renderLegend(th){
 function renderStats(list){
   const unit = state.energy==='elec'?'kWh':'MJ';
   const key = state.energy;
-  const total = list.reduce((s,b)=>s+b[key][state.month],0);
+  const total = list.reduce((s,b)=>s+usageOf(b),0);
 
   // 용도별 집계
   const byUsage = {};
   list.forEach(b=>{
     const u = b.usage || '용도정보 없음';
     (byUsage[u] = byUsage[u] || {n:0,sum:0});
-    byUsage[u].n++; byUsage[u].sum += b[key][state.month];
+    byUsage[u].n++; byUsage[u].sum += usageOf(b);
   });
   const usageRows = Object.entries(byUsage).sort((a,b)=>b[1].sum-a[1].sum);
   const maxU = usageRows.length?usageRows[0][1].sum:1;
 
   // 상위 10개 건물
-  const top = [...list].sort((a,b)=>b[key][state.month]-a[key][state.month]).slice(0,10);
+  const top = [...list].sort((a,b)=>usageOf(b)-usageOf(a)).slice(0,10);
 
   document.getElementById('stats').innerHTML = `
     <div class="card">
-      <h3>${ymLabel(state.month)} ${key==='elec'?'전기':'가스'} 총 사용량</h3>
+      <h3>${periodLabel()} ${key==='elec'?'전기':'가스'} 총 사용량</h3>
       <div class="big">${fmt(total)}<small>${unit}</small></div>
       <div class="sub">대상 ${list.length}개소 · 평균 ${fmt(list.length?total/list.length:0)} ${unit}</div>
     </div>
@@ -383,7 +400,7 @@ function renderStats(list){
       ${top.map((b,i)=>`
         <tr class="rowlink" onclick="focusBuilding('${b.addr.replace(/'/g,"\\'")}')">
         <td>${i+1}</td><td>${b.addr.replace('서울특별시 노원구 ','')}</td>
-        <td class="num">${fmt(b[key][state.month])}</td></tr>`).join('')}
+        <td class="num">${fmt(usageOf(b))}</td></tr>`).join('')}
       </table>
     </div>`;
 }
