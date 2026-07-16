@@ -17,7 +17,7 @@ buildings = {}  # 정규화 주소 -> 건물 정보
 def get(addr):
     if addr not in buildings:
         buildings[addr] = {
-            'addr': addr, 'road': None, 'usage': None,
+            'addr': addr, 'road': None, 'usage': None, 'name': None,
             'siar': None, 'bdar': None, 'gfa': None,
             'elec': {}, 'gas': {}
         }
@@ -34,6 +34,28 @@ for f in glob.glob(os.path.join(BASE, '02. 총괄표제부_*.json')):
         b['siar'] = r.get('SIAR') or b['siar']
         b['bdar'] = r.get('BDAR') or b['bdar']
         b['gfa'] = r.get('GFA') or b['gfa']
+
+# 1-2) 일반건축물대장 표제부 (주용도코드명/건물명 보강)
+# 이미 존재하는 주소(에너지·총괄표제부)에만 매칭하고, 새 주소는 만들지 않음
+# 총괄표제부의 용도가 이미 있으면 유지, 없는 곳만 채움. 주건축물 행 우선.
+def load_pyojebu():
+    filled = 0
+    rows_all = []
+    for f in sorted(glob.glob(os.path.join(BASE, '03. 표제부_*.json'))):
+        with open(f) as fp: rows_all += json.load(fp)['Data']
+    # 1차: 주건축물 행 먼저, 2차: 나머지 행
+    for phase in (True, False):
+        for r in rows_all:
+            is_main = (r.get('MANX_SE_CD_NM') == '주건축물')
+            if phase != is_main: continue
+            a = norm_addr(r.get('PLOT_PSTN'))
+            if not a or a not in buildings: continue   # 기존 주소만 보강
+            b = buildings[a]
+            if not b['usage'] and r.get('MN_USG_CD_NM'):
+                b['usage'] = r['MN_USG_CD_NM']; filled += 1
+            if not b.get('name') and r.get('BLDG_NM'):
+                b['name'] = r['BLDG_NM'].strip()
+    print(f'표제부 용도 보강: {filled}건')
 
 # 에너지 파일 공통 처리: 파일 간 동일 레코드 중복 제거 후 합산
 # (같은 데이터를 여러 번 내려받아 넣어도 이중 합산되지 않도록 함)
@@ -62,6 +84,9 @@ load_energy('01.전기에너지_*.json', 'elec')
 
 # 3) 가스 사용량 (MJ)
 load_energy('02. 가스에너지_*.json', 'gas')
+
+# 4) 일반건축물대장 표제부로 용도/건물명 보강 (에너지 주소 생성 후 실행)
+load_pyojebu()
 
 # 매칭 통계
 n_all = len(buildings)

@@ -423,7 +423,7 @@ function showDetail(b){
       <span class="vl">${v!==undefined?fmt(v)+' '+unit:'-'}</span></div>`;
   }).join('');
   document.getElementById('dbody').innerHTML = `
-    <h2>${b.addr}</h2>
+    <h2>${b.name?b.name+' — ':''}${b.addr}</h2>
     ${b.road?`<div class="road">${b.road}</div>`:''}
     ${b.usage?`<span class="tag">${b.usage}</span>`:'<span class="tag" style="background:#eee;color:#888">용도정보 없음</span>'}
     <div class="meta">
