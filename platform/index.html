@@ -254,13 +254,27 @@ function buildUsageSelect(){
 }
 
 // ── 5) 현재 필터에 맞는 건물 목록 ─────────────────────
+// 용도 필터 통과 여부
+function passUsage(b){
+  if (state.usage==='__none__') return !b.usage;
+  if (state.usage && b.usage!==state.usage) return false;
+  return true;
+}
+// 사용량 있는 건물 (색상 마커 대상)
 function filtered(){
   return DATA.buildings.filter(b=>{
     const v = b[state.energy][state.month];
-    if (v===undefined || v===0) return false;               // 해당 월 사용량 없는 건물 제외
-    if (state.usage==='__none__') return !b.usage;
-    if (state.usage && b.usage!==state.usage) return false; // 용도 필터
-    return true;
+    if (v===undefined || v===0) return false;   // 해당 월 사용량 없는 건물 제외
+    return passUsage(b);
+  });
+}
+// 사용량은 없지만 용도정보(표제부)가 있는 건물 (회색 마커 대상)
+function noDataBuildings(){
+  return DATA.buildings.filter(b=>{
+    const v = b[state.energy][state.month];
+    if (v!==undefined && v!==0) return false;   // 사용량 있으면 색상 마커에서 처리
+    if (!b.usage) return false;                 // 표제부 정보도 없으면 제외
+    return passUsage(b);
   });
 }
 
@@ -301,8 +315,24 @@ function render(){
     shown++;
   });
 
+  // 사용량 데이터가 없는 표제부 건물은 회색 마커로 표시
+  const noData = noDataBuildings();
+  let shownGray = 0;
+  noData.forEach(b=>{
+    const c = coords[b.addr];
+    if (!c) return;
+    const circle = new kakao.maps.Circle({
+      center:new kakao.maps.LatLng(c.lat,c.lng), radius:25,
+      strokeWeight:1, strokeColor:'#6b7280', strokeOpacity:.8,
+      fillColor:'#9ca3af', fillOpacity:.5, map
+    });
+    kakao.maps.event.addListener(circle,'click',()=>showDetail(b));
+    overlays.push(circle);
+    shownGray++;
+  });
+
   document.getElementById('cntInfo').textContent =
-    `표시 대상 ${list.length}개소 (좌표 확인 ${shown}개소)`;
+    `사용량 ${list.length}개소 (좌표 ${shown}) · 사용량없는 건물 ${noData.length}개소 (좌표 ${shownGray})`;
   renderLegend(th);
   renderStats(list);
 }
@@ -312,7 +342,8 @@ function renderLegend(th){
   const lbs = [`~ ${fmt(th[0])}`, `~ ${fmt(th[1])}`, `~ ${fmt(th[2])}`, `~ ${fmt(th[3])}`, `${fmt(th[3])} ~`];
   document.getElementById('legend').innerHTML =
     `<b>${ymLabel(state.month)} ${state.energy==='elec'?'전기':'가스'} 사용량 (${unit})</b>` +
-    GRADES.map((c,i)=>`<div class="g"><span class="dot" style="background:${c}"></span>${lbs[i]}</div>`).join('');
+    GRADES.map((c,i)=>`<div class="g"><span class="dot" style="background:${c}"></span>${lbs[i]}</div>`).join('') +
+    `<div class="g"><span class="dot" style="background:#9ca3af"></span>사용량 정보 없음 (표제부만)</div>`;
 }
 
 // ── 7) 사이드바 통계 ──────────────────────────────────
