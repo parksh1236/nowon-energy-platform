@@ -28,7 +28,8 @@
       "Bash(git commit -m '사용량 없는 표제부 건물도 회색 마커로 지도에 표시 *)",
       "Bash(git -C /Users/psh/nowon1 log --oneline -1)",
       "Bash(curl -s https://parksh1236.github.io/nowon-energy-platform/platform/)",
-      "Bash(git commit -m '상계동 전기사용량 추가 반영 + 파일 간 중복 레코드 제거 로직 *)"
+      "Bash(git commit -m '상계동 전기사용량 추가 반영 + 파일 간 중복 레코드 제거 로직 *)",
+      "Bash(git commit -m '마커 원 크기 통일 \\(사용량 구분은 색상만\\) *)"
     ]
   }
 }

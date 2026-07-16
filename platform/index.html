@@ -295,7 +295,6 @@ function render(){
   // 5분위 기준값 계산 (분포에 따른 등급 색상)
   const q = p => vals.length ? vals[Math.min(vals.length-1, Math.floor(vals.length*p))] : 0;
   const th = [q(.2), q(.4), q(.6), q(.8)];
-  const vmax = vals[vals.length-1]||1;
 
   let shown = 0;
   list.forEach(b=>{
@@ -303,10 +302,9 @@ function render(){
     if (!c) return;
     const v = b[state.energy][state.month];
     const g = gradeOf(v, th);
-    // 사용량에 비례한 반지름 (30m ~ 140m)
-    const radius = 30 + 110*Math.sqrt(v/vmax);
+    // 원 크기는 통일하고 사용량은 색상으로만 구분
     const circle = new kakao.maps.Circle({
-      center:new kakao.maps.LatLng(c.lat,c.lng), radius,
+      center:new kakao.maps.LatLng(c.lat,c.lng), radius:22,
       strokeWeight:1, strokeColor:GRADES[g], strokeOpacity:.9,
       fillColor:GRADES[g], fillOpacity:.45, map
     });
@@ -322,7 +320,7 @@ function render(){
     const c = coords[b.addr];
     if (!c) return;
     const circle = new kakao.maps.Circle({
-      center:new kakao.maps.LatLng(c.lat,c.lng), radius:25,
+      center:new kakao.maps.LatLng(c.lat,c.lng), radius:22,
       strokeWeight:1, strokeColor:'#6b7280', strokeOpacity:.8,
       fillColor:'#9ca3af', fillOpacity:.5, map
     });
