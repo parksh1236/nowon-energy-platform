@@ -85,7 +85,10 @@
     </div>
     <div class="ctrl">
       <label class="t">사용 년월</label>
-      <div class="seg" id="segMonth"></div>
+      <div class="seg">
+        <select id="selYear" style="flex:1"></select>
+        <select id="selMonth" style="flex:1"></select>
+      </div>
     </div>
     <div class="ctrl">
       <label class="t">건축물 용도</label>
@@ -197,14 +200,36 @@ async function geocodeAll(){
 
 // ── 4) 필터 UI 구성 ────────────────────────────────────
 function buildMonthButtons(){
-  const seg = document.getElementById('segMonth');
-  DATA.months.forEach(m=>{
-    const b = document.createElement('button');
-    b.textContent = ymLabel(m); b.dataset.v = m;
-    if (m===state.month) b.classList.add('on');
-    b.onclick = ()=>{ state.month=m; setSeg(seg,b); render(); };
-    seg.appendChild(b);
+  // 연도 드롭다운 + 월 드롭다운 구성 (데이터에 있는 년월만 표시)
+  const selY = document.getElementById('selYear');
+  const selM = document.getElementById('selMonth');
+  const years = [...new Set(DATA.months.map(m=>m.slice(0,4)))].sort();
+
+  // 연도 옵션 채우기
+  years.forEach(y=>{
+    const o = document.createElement('option');
+    o.value=y; o.textContent=y+'년';
+    selY.appendChild(o);
   });
+
+  // 선택된 연도에 해당하는 월 옵션 채우기
+  function fillMonths(year, keep){
+    selM.innerHTML='';
+    DATA.months.filter(m=>m.startsWith(year)).forEach(m=>{
+      const o = document.createElement('option');
+      o.value=m; o.textContent=parseInt(m.slice(4))+'월';
+      selM.appendChild(o);
+    });
+    // 기존 선택 유지, 아니면 해당 연도의 마지막 월 선택
+    selM.value = (keep && keep.startsWith(year)) ? keep : selM.lastChild.value;
+    state.month = selM.value;
+  }
+
+  selY.value = state.month.slice(0,4);
+  fillMonths(selY.value, state.month);
+  selY.onchange = ()=>{ fillMonths(selY.value); render(); };
+  selM.onchange = ()=>{ state.month = selM.value; render(); };
+
   const segE = document.getElementById('segEnergy');
   segE.querySelectorAll('button').forEach(b=>{
     b.onclick = ()=>{ state.energy=b.dataset.v; setSeg(segE,b); render(); };
