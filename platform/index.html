@@ -41,7 +41,7 @@
   .bar { height:6px; background:#4fd1a5; border-radius:3px; margin-top:2px; }
 
   /* ── 상세 패널 ──────────────────────────────── */
-  #detail { position:absolute; top:12px; right:12px; width:330px; max-height:calc(100% - 24px); overflow-y:auto;
+  #detail { position:absolute; top:12px; right:48px; width:330px; max-height:calc(100% - 24px); overflow-y:auto;
             background:#fff; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.25); padding:16px; display:none; z-index:20; }
   #detail h2 { font-size:15px; letter-spacing:-.4px; color:#0f2540; padding-right:24px; }
   #detail .road { font-size:11.5px; color:#667; margin-top:3px; }
@@ -158,12 +158,30 @@ function initMap(){
   // 노원구청 부근을 중심으로 지도 생성
   map = new kakao.maps.Map(document.getElementById('map'),
         { center: new kakao.maps.LatLng(37.6543, 127.0568), level: 6 });
+  // 지도 확대/축소(+/-) 컨트롤 추가 (오른쪽 중앙)
+  map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
+  drawBoundary();                                  // 노원구 경계선 표시
   geocoder = new kakao.maps.services.Geocoder();
   coords = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
   // 사전 계산된 좌표 파일(coords.json)을 먼저 불러와 병합 → 방문자별 재변환 방지
   fetch('coords.json').then(r=>r.ok?r.json():{}).catch(()=>({})).then(pre=>{
     coords = Object.assign({}, pre, coords);
     geocodeAll().then(()=>{ render(); });
+  });
+}
+
+// ── 2-1) 노원구 경계선 그리기 ─────────────────────────
+function drawBoundary(){
+  fetch('nowon_boundary.json').then(r=>r.ok?r.json():null).catch(()=>null).then(rings=>{
+    if (!rings) return;
+    rings.forEach(ring=>{
+      new kakao.maps.Polygon({
+        map,
+        path: ring.map(([lat,lng])=>new kakao.maps.LatLng(lat,lng)),
+        strokeWeight:3, strokeColor:'#0f2540', strokeOpacity:.85, strokeStyle:'solid',
+        fillColor:'#0f2540', fillOpacity:.03    // 경계 안쪽 아주 옅은 음영
+      });
+    });
   });
 }
 
