@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>노원구 에너지정보플랫폼</title>
+<style>
+  /* ── 기본 레이아웃 ───────────────────────────── */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif; }
+  #wrap { display:flex; height:100%; }
+  #sidebar { width:360px; min-width:360px; background:#0f2540; color:#fff; display:flex; flex-direction:column; overflow:hidden; }
+  #map { flex:1; position:relative; }
+
+  /* ── 헤더 ───────────────────────────────────── */
+  .hd { padding:16px 18px 12px; border-bottom:1px solid rgba(255,255,255,.12); }
+  .hd h1 { font-size:19px; letter-spacing:-.5px; }
+  .hd h1 span { color:#4fd1a5; }
+  .hd p { font-size:11.5px; color:#9db3cc; margin-top:4px; }
+
+  /* ── 컨트롤 ─────────────────────────────────── */
+  .ctrl { padding:12px 18px; border-bottom:1px solid rgba(255,255,255,.12); }
+  .ctrl label.t { display:block; font-size:11.5px; color:#9db3cc; margin-bottom:6px; }
+  .seg { display:flex; gap:6px; }
+  .seg button { flex:1; padding:7px 0; font-size:13px; border:1px solid rgba(255,255,255,.25); background:transparent; color:#cdd9e8; border-radius:6px; cursor:pointer; }
+  .seg button.on { background:#4fd1a5; border-color:#4fd1a5; color:#0f2540; font-weight:700; }
+  select { width:100%; padding:7px 8px; font-size:13px; border-radius:6px; border:1px solid rgba(255,255,255,.25); background:#16304f; color:#fff; }
+
+  /* ── 통계/목록 영역 ─────────────────────────── */
+  #stats { flex:1; overflow-y:auto; padding:12px 18px; }
+  .card { background:rgba(255,255,255,.06); border-radius:8px; padding:12px 14px; margin-bottom:12px; }
+  .card h3 { font-size:12.5px; color:#9db3cc; margin-bottom:8px; font-weight:600; }
+  .big { font-size:22px; font-weight:800; color:#4fd1a5; }
+  .big small { font-size:12px; color:#9db3cc; font-weight:400; margin-left:4px; }
+  .sub { font-size:12px; color:#cdd9e8; margin-top:4px; }
+  table.tb { width:100%; border-collapse:collapse; font-size:12px; }
+  table.tb th { text-align:left; color:#9db3cc; font-weight:600; padding:4px 2px; border-bottom:1px solid rgba(255,255,255,.15); }
+  table.tb td { padding:4px 2px; border-bottom:1px solid rgba(255,255,255,.07); color:#e8eef5; }
+  table.tb td.num, table.tb th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .rowlink { cursor:pointer; } .rowlink:hover td { background:rgba(255,255,255,.06); }
+  .bar { height:6px; background:#4fd1a5; border-radius:3px; margin-top:2px; }
+
+  /* ── 상세 패널 ──────────────────────────────── */
+  #detail { position:absolute; top:12px; right:12px; width:330px; max-height:calc(100% - 24px); overflow-y:auto;
+            background:#fff; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.25); padding:16px; display:none; z-index:20; }
+  #detail h2 { font-size:15px; letter-spacing:-.4px; color:#0f2540; padding-right:24px; }
+  #detail .road { font-size:11.5px; color:#667; margin-top:3px; }
+  #detail .tag { display:inline-block; margin-top:8px; padding:3px 8px; font-size:11px; background:#e6f7f0; color:#0b8a5f; border-radius:20px; font-weight:700; }
+  #detail .meta { font-size:12px; color:#445; margin-top:8px; line-height:1.7; }
+  #dclose { position:absolute; top:10px; right:12px; border:none; background:none; font-size:18px; cursor:pointer; color:#889; }
+  .chart { margin-top:12px; }
+  .chart h4 { font-size:12px; color:#0f2540; margin-bottom:6px; }
+  .crow { display:flex; align-items:center; gap:6px; font-size:11px; margin-bottom:4px; color:#334; }
+  .crow .lb { width:52px; color:#667; }
+  .crow .br { height:12px; border-radius:3px; min-width:2px; }
+  .crow .vl { font-variant-numeric:tabular-nums; }
+  .be { background:#3b82f6; } .bg { background:#f59e0b; }
+
+  /* ── 지도 위 오버레이 ───────────────────────── */
+  #legend { position:absolute; left:12px; bottom:28px; z-index:10; background:rgba(255,255,255,.95); border-radius:8px; padding:10px 12px; font-size:11px; color:#334; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+  #legend .g { display:flex; align-items:center; gap:6px; margin-top:3px; }
+  #legend .dot { width:12px; height:12px; border-radius:50%; }
+  #progress { position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:30; background:#0f2540; color:#fff; padding:8px 18px; border-radius:20px; font-size:12.5px; display:none; box-shadow:0 2px 10px rgba(0,0,0,.3); }
+  #sdkerr { position:absolute; inset:0; z-index:50; background:#f4f6f9; display:none; align-items:center; justify-content:center; }
+  #sdkerr .box { max-width:520px; background:#fff; border-radius:12px; padding:28px 32px; box-shadow:0 4px 24px rgba(0,0,0,.12); font-size:14px; line-height:1.8; color:#223; }
+  #sdkerr h2 { font-size:18px; margin-bottom:10px; color:#c0392b; }
+  #sdkerr code { background:#eef2f7; padding:2px 6px; border-radius:4px; font-size:13px; }
+  .cnt { font-size:11px; color:#9db3cc; margin-top:2px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <!-- 왼쪽 사이드바 -->
+  <aside id="sidebar">
+    <div class="hd">
+      <h1>노원구 <span>에너지정보플랫폼</span></h1>
+      <p>건물 총괄표제부 × 전기·가스 사용량 (2025.12 ~ 2026.03)</p>
+    </div>
+    <div class="ctrl">
+      <label class="t">에너지 종류</label>
+      <div class="seg" id="segEnergy">
+        <button data-v="elec" class="on">⚡ 전기 (kWh)</button>
+        <button data-v="gas">🔥 가스 (MJ)</button>
+      </div>
+    </div>
+    <div class="ctrl">
+      <label class="t">사용 년월</label>
+      <div class="seg" id="segMonth"></div>
+    </div>
+    <div class="ctrl">
+      <label class="t">건축물 용도</label>
+      <select id="selUsage"><option value="">전체 용도</option></select>
+      <div class="cnt" id="cntInfo"></div>
+    </div>
+    <div id="stats"></div>
+  </aside>
+
+  <!-- 지도 -->
+  <div id="map">
+    <div id="progress">주소 좌표 변환 중… <span id="pgTxt"></span></div>
+    <div id="legend"></div>
+    <div id="detail">
+      <button id="dclose">✕</button>
+      <div id="dbody"></div>
+    </div>
+    <div id="sdkerr"><div class="box">
+      <h2>카카오지도를 불러올 수 없습니다</h2>
+      카카오 개발자 콘솔(<code>developers.kakao.com</code>)에서 이 앱의<br>
+      <b>[앱 설정 → 플랫폼 → Web]</b> 에 아래 도메인을 등록해 주세요.<br><br>
+      <code>http://localhost:8000</code><br><br>
+      등록 후 이 페이지를 새로고침하면 지도가 표시됩니다.
+    </div></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// 노원구 에너지정보플랫폼 메인 스크립트
+// ══════════════════════════════════════════════════════
+const KAKAO_KEY = 'd5eb9a066a7f486f605d8e200c63d65b';   // 카카오 JavaScript 키
+const CACHE_KEY = 'nowon_geocode_v1';                    // 좌표 캐시(localStorage)
+
+let DATA = null;          // data.json 내용
+let map = null;           // 카카오 지도 객체
+let geocoder = null;      // 주소→좌표 변환기
+let coords = {};          // 주소 → {lat,lng}
+let overlays = [];        // 지도에 그려진 원(Circle) 목록
+let state = { energy:'elec', month:'', usage:'' };  // 현재 필터 상태
+
+const fmt = n => Math.round(n).toLocaleString('ko-KR');
+const ymLabel = ym => ym.slice(0,4) + '.' + ym.slice(4);
+
+// ── 1) 데이터 로드 ─────────────────────────────────────
+fetch('data.json').then(r=>r.json()).then(d=>{
+  DATA = d;
+  state.month = d.months[d.months.length-1];   // 최신 월 기본 선택
+  buildMonthButtons();
+  buildUsageSelect();
+  loadKakao();                                  // 지도 SDK 로드
+});
+
+// ── 2) 카카오 SDK 동적 로드 (도메인 미등록 시 안내) ────
+function loadKakao(){
+  const s = document.createElement('script');
+  s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_KEY}&libraries=services&autoload=false`;
+  s.onload = () => kakao.maps.load(initMap);
+  s.onerror = () => document.getElementById('sdkerr').style.display='flex';
+  document.head.appendChild(s);
+}
+
+function initMap(){
+  // 노원구청 부근을 중심으로 지도 생성
+  map = new kakao.maps.Map(document.getElementById('map'),
+        { center: new kakao.maps.LatLng(37.6543, 127.0568), level: 6 });
+  geocoder = new kakao.maps.services.Geocoder();
+  coords = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+  // 사전 계산된 좌표 파일(coords.json)을 먼저 불러와 병합 → 방문자별 재변환 방지
+  fetch('coords.json').then(r=>r.ok?r.json():{}).catch(()=>({})).then(pre=>{
+    coords = Object.assign({}, pre, coords);
+    geocodeAll().then(()=>{ render(); });
+  });
+}
+
+// ── 3) 주소 일괄 지오코딩 (캐시 사용, 순차 처리) ───────
+async function geocodeAll(){
+  const targets = DATA.buildings.map(b=>b.addr).filter(a=>!(a in coords));
+  if (!targets.length) return;
+  const pg = document.getElementById('progress');
+  pg.style.display='block';
+  let done = 0;
+  for (const addr of targets){
+    await new Promise(res=>{
+      geocoder.addressSearch(addr, (result, status)=>{
+        if (status === kakao.maps.services.Status.OK && result[0]){
+          coords[addr] = { lat:+result[0].y, lng:+result[0].x };
+        } else {
+          coords[addr] = null;   // 변환 실패도 기록(재시도 방지)
+        }
+        res();
+      });
+      setTimeout(res, 1500);     // 응답 지연 대비 안전장치
+    });
+    done++;
+    if (done % 25 === 0){        // 25건마다 캐시 저장 + 진행률 갱신
+      localStorage.setItem(CACHE_KEY, JSON.stringify(coords));
+      document.getElementById('pgTxt').textContent = `${done} / ${targets.length}`;
+      render();                  // 중간중간 지도에 반영
+    }
+    await new Promise(r=>setTimeout(r, 35));   // 호출 간격(과속 방지)
+  }
+  localStorage.setItem(CACHE_KEY, JSON.stringify(coords));
+  pg.style.display='none';
+}
+
+// ── 4) 필터 UI 구성 ────────────────────────────────────
+function buildMonthButtons(){
+  const seg = document.getElementById('segMonth');
+  DATA.months.forEach(m=>{
+    const b = document.createElement('button');
+    b.textContent = ymLabel(m); b.dataset.v = m;
+    if (m===state.month) b.classList.add('on');
+    b.onclick = ()=>{ state.month=m; setSeg(seg,b); render(); };
+    seg.appendChild(b);
+  });
+  const segE = document.getElementById('segEnergy');
+  segE.querySelectorAll('button').forEach(b=>{
+    b.onclick = ()=>{ state.energy=b.dataset.v; setSeg(segE,b); render(); };
+  });
+}
+function setSeg(seg,btn){ seg.querySelectorAll('button').forEach(x=>x.classList.remove('on')); btn.classList.add('on'); }
+
+function buildUsageSelect(){
+  // 용도별 건물 수를 세어 많은 순으로 드롭다운 구성
+  const cnt = {};
+  DATA.buildings.forEach(b=>{ if(b.usage) cnt[b.usage]=(cnt[b.usage]||0)+1; });
+  const sel = document.getElementById('selUsage');
+  Object.entries(cnt).sort((a,b)=>b[1]-a[1]).forEach(([u,c])=>{
+    const o = document.createElement('option');
+    o.value=u; o.textContent=`${u} (${c})`;
+    sel.appendChild(o);
+  });
+  const oNone = document.createElement('option');
+  oNone.value='__none__'; oNone.textContent='용도정보 없음';
+  sel.appendChild(oNone);
+  sel.onchange = ()=>{ state.usage=sel.value; render(); };
+}
+
+// ── 5) 현재 필터에 맞는 건물 목록 ─────────────────────
+function filtered(){
+  return DATA.buildings.filter(b=>{
+    const v = b[state.energy][state.month];
+    if (v===undefined || v===0) return false;               // 해당 월 사용량 없는 건물 제외
+    if (state.usage==='__none__') return !b.usage;
+    if (state.usage && b.usage!==state.usage) return false; // 용도 필터
+    return true;
+  });
+}
+
+// 사용량 → 색상 (5단계: 파랑=적음 ~ 빨강=많음)
+const GRADES = ['#3b82f6','#22c55e','#eab308','#f97316','#ef4444'];
+function gradeOf(v, thresholds){
+  for (let i=0;i<thresholds.length;i++) if (v<=thresholds[i]) return i;
+  return GRADES.length-1;
+}
+
+// ── 6) 지도 + 통계 렌더링 ─────────────────────────────
+function render(){
+  if (!map) return;
+  overlays.forEach(o=>o.setMap(null)); overlays=[];   // 기존 표시 제거
+
+  const list = filtered();
+  const vals = list.map(b=>b[state.energy][state.month]).sort((a,b)=>a-b);
+  // 5분위 기준값 계산 (분포에 따른 등급 색상)
+  const q = p => vals.length ? vals[Math.min(vals.length-1, Math.floor(vals.length*p))] : 0;
+  const th = [q(.2), q(.4), q(.6), q(.8)];
+  const vmax = vals[vals.length-1]||1;
+
+  let shown = 0;
+  list.forEach(b=>{
+    const c = coords[b.addr];
+    if (!c) return;
+    const v = b[state.energy][state.month];
+    const g = gradeOf(v, th);
+    // 사용량에 비례한 반지름 (30m ~ 140m)
+    const radius = 30 + 110*Math.sqrt(v/vmax);
+    const circle = new kakao.maps.Circle({
+      center:new kakao.maps.LatLng(c.lat,c.lng), radius,
+      strokeWeight:1, strokeColor:GRADES[g], strokeOpacity:.9,
+      fillColor:GRADES[g], fillOpacity:.45, map
+    });
+    kakao.maps.event.addListener(circle,'click',()=>showDetail(b));
+    overlays.push(circle);
+    shown++;
+  });
+
+  document.getElementById('cntInfo').textContent =
+    `표시 대상 ${list.length}개소 (좌표 확인 ${shown}개소)`;
+  renderLegend(th);
+  renderStats(list);
+}
+
+function renderLegend(th){
+  const unit = state.energy==='elec'?'kWh':'MJ';
+  const lbs = [`~ ${fmt(th[0])}`, `~ ${fmt(th[1])}`, `~ ${fmt(th[2])}`, `~ ${fmt(th[3])}`, `${fmt(th[3])} ~`];
+  document.getElementById('legend').innerHTML =
+    `<b>${ymLabel(state.month)} ${state.energy==='elec'?'전기':'가스'} 사용량 (${unit})</b>` +
+    GRADES.map((c,i)=>`<div class="g"><span class="dot" style="background:${c}"></span>${lbs[i]}</div>`).join('');
+}
+
+// ── 7) 사이드바 통계 ──────────────────────────────────
+function renderStats(list){
+  const unit = state.energy==='elec'?'kWh':'MJ';
+  const key = state.energy;
+  const total = list.reduce((s,b)=>s+b[key][state.month],0);
+
+  // 용도별 집계
+  const byUsage = {};
+  list.forEach(b=>{
+    const u = b.usage || '용도정보 없음';
+    (byUsage[u] = byUsage[u] || {n:0,sum:0});
+    byUsage[u].n++; byUsage[u].sum += b[key][state.month];
+  });
+  const usageRows = Object.entries(byUsage).sort((a,b)=>b[1].sum-a[1].sum);
+  const maxU = usageRows.length?usageRows[0][1].sum:1;
+
+  // 상위 10개 건물
+  const top = [...list].sort((a,b)=>b[key][state.month]-a[key][state.month]).slice(0,10);
+
+  document.getElementById('stats').innerHTML = `
+    <div class="card">
+      <h3>${ymLabel(state.month)} ${key==='elec'?'전기':'가스'} 총 사용량</h3>
+      <div class="big">${fmt(total)}<small>${unit}</small></div>
+      <div class="sub">대상 ${list.length}개소 · 평균 ${fmt(list.length?total/list.length:0)} ${unit}</div>
+    </div>
+    <div class="card">
+      <h3>건축물 용도별 사용량</h3>
+      <table class="tb"><tr><th>용도</th><th class="num">개소</th><th class="num">${unit}</th></tr>
+      ${usageRows.map(([u,o])=>`
+        <tr><td>${u}<div class="bar" style="width:${Math.max(2,100*o.sum/maxU)}%"></div></td>
+        <td class="num">${o.n}</td><td class="num">${fmt(o.sum)}</td></tr>`).join('')}
+      </table>
+    </div>
+    <div class="card">
+      <h3>사용량 상위 10개소</h3>
+      <table class="tb"><tr><th>#</th><th>주소</th><th class="num">${unit}</th></tr>
+      ${top.map((b,i)=>`
+        <tr class="rowlink" onclick="focusBuilding('${b.addr.replace(/'/g,"\\'")}')">
+        <td>${i+1}</td><td>${b.addr.replace('서울특별시 노원구 ','')}</td>
+        <td class="num">${fmt(b[key][state.month])}</td></tr>`).join('')}
+      </table>
+    </div>`;
+}
+
+// 상위 목록 클릭 → 지도 이동 + 상세
+function focusBuilding(addr){
+  const b = DATA.buildings.find(x=>x.addr===addr);
+  const c = coords[addr];
+  if (b && c){ map.setLevel(4); map.panTo(new kakao.maps.LatLng(c.lat,c.lng)); showDetail(b); }
+}
+
+// ── 8) 건물 상세 패널 (월별 전기/가스 차트) ───────────
+function showDetail(b){
+  const eMax = Math.max(1,...DATA.months.map(m=>b.elec[m]||0));
+  const gMax = Math.max(1,...DATA.months.map(m=>b.gas[m]||0));
+  const rows = (obj,max,cls,unit)=>DATA.months.map(m=>{
+    const v = obj[m];
+    return `<div class="crow"><span class="lb">${ymLabel(m)}</span>
+      <span class="br ${cls}" style="width:${v?Math.max(2,150*v/max):0}px"></span>
+      <span class="vl">${v!==undefined?fmt(v)+' '+unit:'-'}</span></div>`;
+  }).join('');
+  document.getElementById('dbody').innerHTML = `
+    <h2>${b.addr}</h2>
+    ${b.road?`<div class="road">${b.road}</div>`:''}
+    ${b.usage?`<span class="tag">${b.usage}</span>`:'<span class="tag" style="background:#eee;color:#888">용도정보 없음</span>'}
+    <div class="meta">
+      ${b.gfa?`연면적 ${fmt(b.gfa)}㎡ · 건축면적 ${fmt(b.bdar||0)}㎡ · 대지면적 ${fmt(b.siar||0)}㎡`:''}
+    </div>
+    <div class="chart"><h4>⚡ 월별 전기 사용량</h4>${rows(b.elec,eMax,'be','kWh')}</div>
+    <div class="chart"><h4>🔥 월별 가스 사용량</h4>${rows(b.gas,gMax,'bg','MJ')}</div>`;
+  document.getElementById('detail').style.display='block';
+}
+document.getElementById('dclose').onclick = ()=>document.getElementById('detail').style.display='none';
+</script>
+</body>
+</html>

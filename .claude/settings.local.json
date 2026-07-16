@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(python3)",
+      "Bash(curl -s \"https://dapi.kakao.com/v2/local/search/address.json?query=%EC%84%9C%EC%9A%B8%ED%8A%B9%EB%B3%84%EC%8B%9C%20%EB%85%B8%EC%9B%90%EA%B5%AC%20%EC%9B%94%EA%B3%84%EB%8F%99%203-7\" -H \"Authorization: KakaoAK d5eb9a066a7f486f605d8e200c63d65b\")",
+      "Bash(curl -s \"https://dapi.kakao.com/v2/local/search/address.json?query=%EC%84%9C%EC%9A%B8%20%EB%85%B8%EC%9B%90%EA%B5%AC%20%EC%9B%94%EA%B3%84%EB%8F%99%203-7\" -H \"Authorization: KakaoAK d5eb9a066a7f486f605d8e200c63d65b\" -H \"origin: http://localhost:8000\")",
+      "Bash(curl -s \"https://dapi.kakao.com/v2/local/search/address.json?query=%EC%84%9C%EC%9A%B8%20%EB%85%B8%EC%9B%90%EA%B5%AC%20%EC%9B%94%EA%B3%84%EB%8F%99%203-7\" -H \"Authorization: KakaoAK d5eb9a066a7f486f605d8e200c63d65b\" -H \"KA: sdk/4.4.15 os/javascript origin/http://localhost:8000\")",
+      "WebSearch",
+      "Bash(python3 /Users/psh/nowon1/platform/build_data.py)",
+      "Bash(python3 /private/tmp/claude-501/-Users-psh-nowon1/98f89a56-ad61-433e-a9cb-8bf399b41316/scratchpad/recv.py)",
+      "Bash(gh auth *)",
+      "Bash(git config *)",
+      "Read(//Users/psh/.ssh/**)",
+      "Bash(git ls-remote *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit -m '노원구 에너지정보플랫폼: 데이터 통합 + 카카오맵 시각화 *)"
+    ]
+  }
+}
