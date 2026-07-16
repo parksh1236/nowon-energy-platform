@@ -35,29 +35,33 @@ for f in glob.glob(os.path.join(BASE, '02. 총괄표제부_*.json')):
         b['bdar'] = r.get('BDAR') or b['bdar']
         b['gfa'] = r.get('GFA') or b['gfa']
 
-# 2) 전기 사용량 (KWh)
-for f in glob.glob(os.path.join(BASE, '01.전기에너지_*.json')):
-    with open(f) as fp: rows = json.load(fp)['Data']
-    for r in rows:
-        a = norm_addr(r['PLOT_PSTN'])
-        if not a: continue
-        b = get(a)
-        ym = r['USE_YM']
-        b['elec'][ym] = b['elec'].get(ym, 0) + (r['USGQTY'] or 0)
-        if r.get('ROAD_NM_PLOT_PSTN') and not b['road']:
-            b['road'] = r['ROAD_NM_PLOT_PSTN'].strip()
+# 에너지 파일 공통 처리: 파일 간 동일 레코드 중복 제거 후 합산
+# (같은 데이터를 여러 번 내려받아 넣어도 이중 합산되지 않도록 함)
+def load_energy(pattern, field):
+    seen = set()      # (주소, 년월, 일련번호) — 동일 레코드 식별 키
+    dup_count = 0
+    for f in sorted(glob.glob(os.path.join(BASE, pattern))):
+        with open(f) as fp: rows = json.load(fp)['Data']
+        for r in rows:
+            a = norm_addr(r['PLOT_PSTN'])
+            if not a: continue
+            ym = r['USE_YM']
+            key = (a, ym, r.get('SN'))
+            if key in seen:          # 이미 처리한 레코드는 건너뜀
+                dup_count += 1
+                continue
+            seen.add(key)
+            b = get(a)
+            b[field][ym] = b[field].get(ym, 0) + (r['USGQTY'] or 0)
+            if r.get('ROAD_NM_PLOT_PSTN') and not b['road']:
+                b['road'] = r['ROAD_NM_PLOT_PSTN'].strip()
+    print(f'{field}: 중복 제거 {dup_count}건')
 
-# 3) 가스 사용량 (MJ 단위로 표기되는 경우가 많으나 원본 필드명 기준 사용량)
-for f in glob.glob(os.path.join(BASE, '02. 가스에너지_*.json')):
-    with open(f) as fp: rows = json.load(fp)['Data']
-    for r in rows:
-        a = norm_addr(r['PLOT_PSTN'])
-        if not a: continue
-        b = get(a)
-        ym = r['USE_YM']
-        b['gas'][ym] = b['gas'].get(ym, 0) + (r['USGQTY'] or 0)
-        if r.get('ROAD_NM_PLOT_PSTN') and not b['road']:
-            b['road'] = r['ROAD_NM_PLOT_PSTN'].strip()
+# 2) 전기 사용량 (KWh)
+load_energy('01.전기에너지_*.json', 'elec')
+
+# 3) 가스 사용량 (MJ)
+load_energy('02. 가스에너지_*.json', 'gas')
 
 # 매칭 통계
 n_all = len(buildings)

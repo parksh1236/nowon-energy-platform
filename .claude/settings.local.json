@@ -25,7 +25,10 @@
       "Bash(git push *)",
       "Bash(md5 -q \"02. 총괄표제부_20260716173850.json\" \"02. 총괄표제부_20260716175110.json\" \"02. 총괄표제부_20260716173903.json\" \"02. 총괄표제부_20260716180702.json\")",
       "Bash(git commit -m '사용 년월 선택을 연도/월 드롭다운으로 변경 *)",
-      "Bash(git commit -m '사용량 없는 표제부 건물도 회색 마커로 지도에 표시 *)"
+      "Bash(git commit -m '사용량 없는 표제부 건물도 회색 마커로 지도에 표시 *)",
+      "Bash(git -C /Users/psh/nowon1 log --oneline -1)",
+      "Bash(curl -s https://parksh1236.github.io/nowon-energy-platform/platform/)",
+      "Bash(git commit -m '상계동 전기사용량 추가 반영 + 파일 간 중복 레코드 제거 로직 *)"
     ]
   }
 }
