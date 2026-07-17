@@ -741,7 +741,7 @@ function showCarbonSection(key){
       <div class="cpsub">${o.date} · ${o.period}</div>
       <div class="dash3">
         <div class="dcard"><div class="dv">${fmt(o.keyNumbers.totalReduction)}</div><div class="dl">2030 감축목표 (tCO₂eq)</div></div>
-        <div class="dcard"><div class="dv">${o.keyNumbers.totalBudget.toLocaleString()}억</div><div class="dl">총사업비 (2026~2030)</div></div>
+        <div class="dcard"><div class="dv">2026~2030</div><div class="dl">계획기간 (5개년)</div></div>
         <div class="dcard"><div class="dv">30개</div><div class="dl">추진 사업</div></div>
       </div>
       <div class="dsec">비전</div>
@@ -789,7 +789,6 @@ function showCarbonSection(key){
 
   if (key === 'targets'){
     const maxRed = Math.max(...t.yearly.map(y=>y.reduction));
-    const maxBud = Math.max(...t.yearly.map(y=>y.budget));
     const maxSec = Math.max(...t.sector2030.map(x=>x.reduction));
     html = `
       <h2>🎯 연차별 목표와 달성률</h2>
@@ -797,29 +796,18 @@ function showCarbonSection(key){
       <div class="dash3">
         <div class="dcard"><div class="dv">${fmt(t.yearly[4].reduction)}</div><div class="dl">2030 누적 감축목표 (tCO₂eq)</div></div>
         <div class="dcard"><div class="dv">${fmt(t.yearly[0].reduction)}</div><div class="dl">2026 첫해 목표 (tCO₂eq)</div></div>
-        <div class="dcard"><div class="dv">1,084.3억</div><div class="dl">5년 총 투자</div></div>
+        <div class="dcard"><div class="dv">40.6%</div><div class="dl">2030 관리권한 배출 감축률 목표</div></div>
       </div>
-      <div class="dgrid2">
-        <div>
-          <div class="dsec">연차별 누적 감축목표 · 달성률</div>
-          ${t.yearly.map(y=>`
-            <div class="cyr"><span class="cl">${y.year}</span>
-            <span class="cb" style="width:${Math.max(3,260*y.reduction/maxRed)}px"></span>
-            <span class="cv">${fmt(y.reduction)} <b style="color:#0b8a5f">(${y.rate}%)</b></span></div>`).join('')}
-        </div>
-        <div>
-          <div class="dsec">연차별 투자계획 (억원)</div>
-          ${t.yearly.map(y=>`
-            <div class="cyr"><span class="cl">${y.year}</span>
-            <span class="cb" style="background:#2563eb;width:${260*y.budget/maxBud}px"></span>
-            <span class="cv">${y.budget.toLocaleString()}</span></div>`).join('')}
-        </div>
-      </div>
+      <div class="dsec">연차별 누적 감축목표 · 달성률</div>
+      ${t.yearly.map(y=>`
+        <div class="cyr"><span class="cl">${y.year}</span>
+        <span class="cb" style="width:${Math.max(3,380*y.reduction/maxRed)}px"></span>
+        <span class="cv">${fmt(y.reduction)} <b style="color:#0b8a5f">(${y.rate}%)</b></span></div>`).join('')}
       <div class="dsec">부문별 2030 감축목표</div>
       ${t.sector2030.map(x=>`
         <div class="cyr"><span class="cl" style="width:100px">${x.name}</span>
         <span class="cb" style="width:${Math.max(3,380*x.reduction/maxSec)}px"></span>
-        <span class="cv">${fmt(x.reduction)} tCO₂eq · ${x.budget.toLocaleString()}억원</span></div>`).join('')}`;
+        <span class="cv">${fmt(x.reduction)} tCO₂eq</span></div>`).join('')}`;
   }
 
   if (key === 'roadmap'){
@@ -850,7 +838,6 @@ function showCarbonDetail(p){
     <h2>${p.id}. ${p.name}</h2>
     <span class="ptag">${p.sector} 부문</span><span class="ptag" style="background:#eef2f7;color:#445">${p.type}</span>
     <div class="kpi" style="max-width:420px">
-      <div style="background:#eafaf3"><div class="v" style="color:#0b8a5f">${p.budget.toLocaleString()}억</div><div class="l" style="color:#667">총사업비</div></div>
       <div style="background:#eef4fd"><div class="v" style="color:#2563eb">${p.reduction?fmt(p.reduction):'—'}</div><div class="l" style="color:#667">2030 감축목표 (tCO₂eq)</div></div>
     </div>
     ${d ? `<table class="dt">
@@ -858,7 +845,6 @@ function showCarbonDetail(p){
       ${d.기간?`<tr><th>사업기간</th><td>${d.기간}</td></tr>`:''}
       ${d.대상지?`<tr><th>사업 대상지</th><td>${d.대상지}</td></tr>`:''}
       ${d.모델?`<tr><th>사업모델</th><td>${d.모델}</td></tr>`:''}
-      ${d.재원?`<tr><th>사업비/재원</th><td>${d.재원}</td></tr>`:''}
       ${d.운영?`<tr><th>운영/관리</th><td>${d.운영}</td></tr>`:''}
       ${d.차별성?`<tr><th>차별성</th><td>${d.차별성}</td></tr>`:''}
       ${d.확산?`<tr><th>확산 방향</th><td>${d.확산}</td></tr>`:''}
