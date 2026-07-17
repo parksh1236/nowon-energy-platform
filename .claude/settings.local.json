@@ -49,7 +49,8 @@
       "Bash(pip3 list *)",
       "Bash(pip3 install *)",
       "Bash(python3 -c \"import fitz; print\\('pymupdf', fitz.__doc__\\)\")",
-      "Bash(git commit -m '탄소중립계획 탭 추가: 선도도시 개요·현황·연차별 목표·로드맵·세부사업 30개 \\(기본계획 PDF 기반\\) *)"
+      "Bash(git commit -m '탄소중립계획 탭 추가: 선도도시 개요·현황·연차별 목표·로드맵·세부사업 30개 \\(기본계획 PDF 기반\\) *)",
+      "Bash(git commit -m 'CLAUDE.md: 2개 탭 구성 및 carbon.json 문서화 *)"
     ]
   }
 }
