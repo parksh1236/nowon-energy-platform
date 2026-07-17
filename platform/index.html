@@ -76,6 +76,49 @@
   .mini { float:right; font-size:10.5px; padding:1px 7px; border:1px solid rgba(255,255,255,.3); background:transparent; color:#9db3cc; border-radius:10px; cursor:pointer; }
   .mini:hover { color:#4fd1a5; border-color:#4fd1a5; }
 
+  /* ── 상단 탭 ────────────────────────────────── */
+  .tabs { display:flex; gap:6px; margin-top:10px; }
+  .tabs button { flex:1; padding:8px 0; font-size:13.5px; font-weight:700; border:1px solid rgba(255,255,255,.25);
+    background:transparent; color:#cdd9e8; border-radius:8px; cursor:pointer; }
+  .tabs button.on { background:#4fd1a5; border-color:#4fd1a5; color:#0f2540; }
+
+  /* ── 탄소중립계획 탭 ────────────────────────── */
+  #tabCarbon { flex:1; overflow-y:auto; padding:12px 18px; }
+  #tabCarbon .card h3 { color:#7fe3c0; }
+  #tabCarbon .sec { font-size:13.5px; font-weight:800; color:#fff; margin:14px 0 8px; padding-bottom:5px; border-bottom:2px solid #4fd1a5; }
+  #tabCarbon ul { margin:4px 0 4px 16px; }
+  #tabCarbon li { font-size:12px; color:#cdd9e8; line-height:1.65; margin-bottom:3px; }
+  .kpi { display:flex; gap:8px; margin:8px 0; }
+  .kpi > div { flex:1; background:rgba(79,209,165,.12); border-radius:8px; padding:8px; text-align:center; }
+  .kpi .v { font-size:16px; font-weight:800; color:#4fd1a5; }
+  .kpi .l { font-size:10.5px; color:#9db3cc; margin-top:2px; }
+  .yrow { display:flex; align-items:center; gap:6px; font-size:11px; margin-bottom:5px; color:#cdd9e8; }
+  .yrow .yl { width:38px; color:#9db3cc; }
+  .yrow .yb { height:13px; border-radius:3px; background:#4fd1a5; min-width:2px; }
+  .yrow .yb.alt { background:#3b82f6; }
+  .yrow .yv { font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .pj { padding:7px 9px; border-radius:6px; background:rgba(255,255,255,.05); margin-bottom:5px; cursor:pointer; font-size:12px; color:#e8eef5; }
+  .pj:hover { background:rgba(79,209,165,.16); }
+  .pj .pid { color:#7fe3c0; font-weight:700; margin-right:4px; }
+  .pj .pmeta { font-size:10.5px; color:#9db3cc; margin-top:2px; }
+  .phase { background:rgba(255,255,255,.06); border-left:3px solid #4fd1a5; border-radius:0 8px 8px 0; padding:9px 12px; margin-bottom:8px; }
+  .phase b { font-size:12.5px; color:#7fe3c0; }
+  .phase .py { font-size:11px; color:#9db3cc; margin-left:6px; }
+
+  /* ── 탄소중립 사업 상세(지도 영역 패널) ──────── */
+  #carbonPanel { position:absolute; inset:12px; z-index:25; background:#fff; border-radius:12px;
+    box-shadow:0 6px 28px rgba(0,0,0,.3); padding:22px 26px; overflow-y:auto; display:none; }
+  #carbonPanel h2 { font-size:18px; color:#0f2540; padding-right:30px; }
+  #carbonPanel .ptag { display:inline-block; margin:8px 6px 0 0; padding:3px 10px; font-size:11px; border-radius:20px; font-weight:700; background:#e6f7f0; color:#0b8a5f; }
+  #carbonPanel table.dt { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:14px; }
+  #carbonPanel table.dt th { width:110px; text-align:left; color:#667; font-weight:600; padding:7px 8px; background:#f4f7fa; border:1px solid #e4eaf0; vertical-align:top; }
+  #carbonPanel table.dt td { padding:7px 10px; border:1px solid #e4eaf0; color:#223; line-height:1.55; }
+  #cpClose { position:absolute; top:14px; right:16px; border:none; background:none; font-size:20px; cursor:pointer; color:#889; }
+  .cyr { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; color:#334; }
+  .cyr .cl { width:44px; color:#667; }
+  .cyr .cb { height:14px; border-radius:3px; background:#0ea371; min-width:2px; }
+  .cyr .cv { font-variant-numeric:tabular-nums; }
+
   /* ── 검색창 ─────────────────────────────────── */
   #searchBox { width:100%; padding:8px 10px; font-size:13px; border-radius:6px; border:1px solid rgba(255,255,255,.25); background:#16304f; color:#fff; }
   #searchBox::placeholder { color:#7a8fa8; }
@@ -93,8 +136,12 @@
   <aside id="sidebar">
     <div class="hd">
       <h1>노원구 <span>에너지정보플랫폼</span></h1>
-      <p>건물 총괄표제부 × 전기·가스 사용량 (2024.01 ~ 2026.03)</p>
+      <div class="tabs">
+        <button id="tabBtnEnergy" class="on">⚡ 에너지정보</button>
+        <button id="tabBtnCarbon">🌱 탄소중립계획</button>
+      </div>
     </div>
+    <div id="tabEnergy">
     <div class="ctrl" style="position:relative">
       <label class="t">검색 (주소 · 건물명)</label>
       <input id="searchBox" type="text" placeholder="예: 상계동 666, 해링턴, 마들로 45" autocomplete="off">
@@ -123,6 +170,8 @@
     <div style="padding:8px 18px; border-top:1px solid rgba(255,255,255,.12)">
       <button id="exportCoords" class="mini" style="float:none">📥 좌표 캐시 내보내기 (coords.json)</button>
     </div>
+    </div><!-- /tabEnergy -->
+    <div id="tabCarbon" style="display:none"></div>
   </aside>
 
   <!-- 지도 -->
@@ -132,6 +181,10 @@
     <div id="detail">
       <button id="dclose">✕</button>
       <div id="dbody"></div>
+    </div>
+    <div id="carbonPanel">
+      <button id="cpClose">✕</button>
+      <div id="cpBody"></div>
     </div>
     <div id="sdkerr"><div class="box">
       <h2>카카오지도를 불러올 수 없습니다</h2>
@@ -589,6 +642,154 @@ function showDetail(b){
   document.getElementById('detail').style.display='block';
 }
 document.getElementById('dclose').onclick = ()=>document.getElementById('detail').style.display='none';
+
+// ══════════════════════════════════════════════════════
+// 탄소중립계획 탭
+// ══════════════════════════════════════════════════════
+let CARBON = null;   // carbon.json 내용
+
+// 탭 전환 처리
+const btnE = document.getElementById('tabBtnEnergy');
+const btnC = document.getElementById('tabBtnCarbon');
+btnE.onclick = ()=>{
+  btnE.classList.add('on'); btnC.classList.remove('on');
+  document.getElementById('tabEnergy').style.display='';
+  document.getElementById('tabCarbon').style.display='none';
+  document.getElementById('carbonPanel').style.display='none';   // 지도 다시 보이게
+};
+btnC.onclick = ()=>{
+  btnC.classList.add('on'); btnE.classList.remove('on');
+  document.getElementById('tabEnergy').style.display='none';
+  document.getElementById('tabCarbon').style.display='block';
+  document.getElementById('detail').style.display='none';        // 건물 상세 닫기
+  if (!CARBON){
+    fetch('carbon.json').then(r=>r.json()).then(d=>{ CARBON=d; renderCarbon(); });
+  }
+};
+
+// ── 탄소중립계획 사이드바 렌더링 ──────────────────────
+function renderCarbon(){
+  const o = CARBON.overview, s = CARBON.status, t = CARBON.targets;
+  const maxRed = Math.max(...t.yearly.map(y=>y.reduction));
+  const maxBud = Math.max(...t.yearly.map(y=>y.budget));
+  const maxSec = Math.max(...t.sector2030.map(x=>x.reduction));
+  const shareMax = Math.max(...s.sectorShare.map(x=>x[1]));
+
+  document.getElementById('tabCarbon').innerHTML = `
+    <div class="sec">🌱 탄소중립 선도도시 개요</div>
+    <div class="card">
+      <h3>${o.title} (${o.date})</h3>
+      <div style="font-size:12.5px;color:#e8eef5;line-height:1.6;margin-bottom:8px"><b style="color:#4fd1a5">비전</b> — ${o.vision}</div>
+      <div class="sub">${o.period}</div>
+      <div class="kpi">
+        <div><div class="v">${fmt(o.keyNumbers.totalReduction)}</div><div class="l">2030 감축목표 (tCO₂eq)</div></div>
+        <div><div class="v">${o.keyNumbers.totalBudget.toLocaleString()}</div><div class="l">총사업비 (억원)</div></div>
+        <div><div class="v">30개</div><div class="l">추진 사업</div></div>
+      </div>
+      <ul>${o.direction.map(d=>`<li>${d}</li>`).join('')}</ul>
+      <div style="font-size:11.5px;color:#9db3cc;margin-top:6px">${o.keyNumbers.contribution}<br>${o.keyNumbers.target2030}</div>
+    </div>
+
+    <div class="sec">📊 온실가스 배출 현황</div>
+    <div class="card">
+      <h3>관리권한 배출량 추이 (천tCO₂eq)</h3>
+      ${s.byYear.years.map((y,i)=>`
+        <div class="yrow"><span class="yl">${y}</span>
+        <span class="yb alt" style="width:${130*s.byYear['합계'][i]/1700}px"></span>
+        <span class="yv">${fmt(s.byYear['합계'][i])}</span></div>`).join('')}
+      <div class="sub" style="margin-top:6px">2018년 총 배출량 ${fmt(s.total2018.all)}천tCO₂eq (직접 ${s.total2018.direct} · 간접 ${s.total2018.indirect})</div>
+    </div>
+    <div class="card">
+      <h3>부문별 배출 비중 (2018)</h3>
+      ${s.sectorShare.map(([n,v])=>`
+        <div class="yrow"><span class="yl" style="width:64px">${n}</span>
+        <span class="yb" style="width:${120*v/shareMax}px"></span>
+        <span class="yv">${v}%</span></div>`).join('')}
+      <ul style="margin-top:6px">${s.notes.map(n=>`<li>${n}</li>`).join('')}</ul>
+    </div>
+
+    <div class="sec">🎯 연차별 목표와 달성률</div>
+    <div class="card">
+      <h3>연차별 누적 감축목표 · 달성률 (신규사업, tCO₂eq)</h3>
+      ${t.yearly.map(y=>`
+        <div class="yrow"><span class="yl">${y.year}</span>
+        <span class="yb" style="width:${130*y.reduction/maxRed}px"></span>
+        <span class="yv">${fmt(y.reduction)} (${y.rate}%)</span></div>`).join('')}
+      <div class="sub" style="margin-top:5px">${t.note}</div>
+    </div>
+    <div class="card">
+      <h3>연차별 투자계획 (억원)</h3>
+      ${t.yearly.map(y=>`
+        <div class="yrow"><span class="yl">${y.year}</span>
+        <span class="yb alt" style="width:${130*y.budget/maxBud}px"></span>
+        <span class="yv">${y.budget.toLocaleString()}</span></div>`).join('')}
+      <div class="sub" style="margin-top:5px">5년 총 1,084.3억원</div>
+    </div>
+    <div class="card">
+      <h3>부문별 2030 감축목표 (tCO₂eq / 사업비 억원)</h3>
+      ${t.sector2030.map(x=>`
+        <div class="yrow"><span class="yl" style="width:76px">${x.name}</span>
+        <span class="yb" style="width:${Math.max(2,120*x.reduction/maxSec)}px"></span>
+        <span class="yv">${fmt(x.reduction)} / ${x.budget.toLocaleString()}억</span></div>`).join('')}
+    </div>
+
+    <div class="sec">🗓️ 단계별 추진 계획 (2026~2030)</div>
+    ${CARBON.roadmap.map(p=>`
+      <div class="phase"><b>${p.phase}</b><span class="py">${p.years} · ${p.desc}</span>
+        <ul>${p.items.map(i=>`<li>${i}</li>`).join('')}</ul>
+      </div>`).join('')}
+
+    <div class="sec">📋 부문별 세부사업 (${CARBON.projects.length}개) — 클릭 시 상세</div>
+    ${['건물','수송','폐기물','흡수원','전환','기후변화적응'].map(sec=>{
+      const list = CARBON.projects.filter(p=>p.sector===sec);
+      if (!list.length) return '';
+      return `<div style="font-size:12px;font-weight:700;color:#9db3cc;margin:10px 0 5px">■ ${sec} 부문 (${list.length})</div>` +
+        list.map(p=>`
+          <div class="pj" data-pj="${CARBON.projects.indexOf(p)}">
+            <span class="pid">${p.id}</span>${p.name}
+            <div class="pmeta">${p.type} · 사업비 ${p.budget.toLocaleString()}억원${p.reduction?` · 감축 ${fmt(p.reduction)} tCO₂eq`:''}</div>
+          </div>`).join('');
+    }).join('')}`;
+
+  // 사업 클릭 → 지도 영역에 상세 패널 표시
+  document.querySelectorAll('#tabCarbon .pj').forEach(el=>{
+    el.onclick = ()=>showCarbonDetail(CARBON.projects[+el.dataset.pj]);
+  });
+}
+
+// ── 세부사업 상세 (지도 영역 패널) ────────────────────
+function showCarbonDetail(p){
+  const d = p.detail;
+  const years = [2026,2027,2028,2029,2030];
+  const maxY = p.yearly ? Math.max(...p.yearly, 1) : 1;
+  document.getElementById('cpBody').innerHTML = `
+    <h2>${p.id}. ${p.name}</h2>
+    <span class="ptag">${p.sector} 부문</span><span class="ptag" style="background:#eef2f7;color:#445">${p.type}</span>
+    <div class="kpi" style="max-width:420px">
+      <div style="background:#eafaf3"><div class="v" style="color:#0b8a5f">${p.budget.toLocaleString()}억</div><div class="l" style="color:#667">총사업비</div></div>
+      <div style="background:#eef4fd"><div class="v" style="color:#2563eb">${p.reduction?fmt(p.reduction):'—'}</div><div class="l" style="color:#667">2030 감축목표 (tCO₂eq)</div></div>
+    </div>
+    ${d ? `<table class="dt">
+      ${d.내용?`<tr><th>사업내용</th><td>${d.내용}</td></tr>`:''}
+      ${d.기간?`<tr><th>사업기간</th><td>${d.기간}</td></tr>`:''}
+      ${d.대상지?`<tr><th>사업 대상지</th><td>${d.대상지}</td></tr>`:''}
+      ${d.모델?`<tr><th>사업모델</th><td>${d.모델}</td></tr>`:''}
+      ${d.재원?`<tr><th>사업비/재원</th><td>${d.재원}</td></tr>`:''}
+      ${d.운영?`<tr><th>운영/관리</th><td>${d.운영}</td></tr>`:''}
+      ${d.차별성?`<tr><th>차별성</th><td>${d.차별성}</td></tr>`:''}
+      ${d.확산?`<tr><th>확산 방향</th><td>${d.확산}</td></tr>`:''}
+    </table>` : `<table class="dt">
+      <tr><th>사업내용</th><td>${p.desc||''}</td></tr>
+      ${p.roadmap?`<tr><th>추진 일정</th><td>${p.roadmap}</td></tr>`:''}
+    </table>`}
+    ${p.yearly ? `<h3 style="font-size:13.5px;color:#0f2540;margin:16px 0 8px">연차별 누적 감축목표 (tCO₂eq)</h3>
+      ${years.map((y,i)=>`
+        <div class="cyr"><span class="cl">${y}</span>
+        <span class="cb" style="width:${Math.max(2,300*p.yearly[i]/maxY)}px"></span>
+        <span class="cv">${p.yearly[i]?fmt(p.yearly[i]):'-'}</span></div>`).join('')}` : ''}`;
+  document.getElementById('carbonPanel').style.display='block';
+}
+document.getElementById('cpClose').onclick = ()=>document.getElementById('carbonPanel').style.display='none';
 
 // ── 9) 좌표 캐시 내보내기 ─────────────────────────────
 // 새 주소 지오코딩 후 이 버튼으로 coords.json을 내려받아
