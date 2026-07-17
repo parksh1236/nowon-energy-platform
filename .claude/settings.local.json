@@ -50,7 +50,9 @@
       "Bash(pip3 install *)",
       "Bash(python3 -c \"import fitz; print\\('pymupdf', fitz.__doc__\\)\")",
       "Bash(git commit -m '탄소중립계획 탭 추가: 선도도시 개요·현황·연차별 목표·로드맵·세부사업 30개 \\(기본계획 PDF 기반\\) *)",
-      "Bash(git commit -m 'CLAUDE.md: 2개 탭 구성 및 carbon.json 문서화 *)"
+      "Bash(git commit -m 'CLAUDE.md: 2개 탭 구성 및 carbon.json 문서화 *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://parksh1236.github.io/nowon-energy-platform/platform/)",
+      "Bash(git commit -m '탄소중립계획 탭: 사이드바는 제목 메뉴만, 세부내용은 오른쪽 대시보드로 개편 *)"
     ]
   }
 }
