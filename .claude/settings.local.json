@@ -54,7 +54,8 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://parksh1236.github.io/nowon-energy-platform/platform/)",
       "Bash(git commit -m '탄소중립계획 탭: 사이드바는 제목 메뉴만, 세부내용은 오른쪽 대시보드로 개편 *)",
       "Bash(grep -oE '[^,{]*백만원[^,}]*' /Users/psh/nowon1/platform/carbon.json)",
-      "Bash(git commit -m '탄소중립계획에서 사업비·재원 정보 제거 \\(화면 및 데이터 파일\\) *)"
+      "Bash(git commit -m '탄소중립계획에서 사업비·재원 정보 제거 \\(화면 및 데이터 파일\\) *)",
+      "Bash(git commit -m '부문별 세부사업: 사이드바는 부문 제목만, 사업 목록·상세는 대시보드에서 2단계 탐색 *)"
     ]
   }
 }

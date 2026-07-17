@@ -131,6 +131,17 @@
   .dnote { font-size:11px; color:#889; margin-top:6px; }
   @media (max-width:1100px){ .dgrid2,.dgrid3 { grid-template-columns:1fr; } }
 
+  /* ── 대시보드 사업 목록/뒤로가기 ─────────────── */
+  .plist { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  .pli { background:#f8fafc; border:1px solid #e4eaf0; border-radius:10px; padding:11px 14px; cursor:pointer; }
+  .pli:hover { border-color:#4fd1a5; background:#f0faf6; }
+  .plit { font-size:13px; font-weight:700; color:#0f2540; line-height:1.45; }
+  .plit .pid { color:#0b8a5f; }
+  .plim { font-size:11px; color:#889; margin-top:4px; }
+  .backlink { display:inline-block; font-size:12.5px; color:#0b8a5f; font-weight:700; cursor:pointer; margin-bottom:10px; }
+  .backlink:hover { text-decoration:underline; }
+  @media (max-width:1100px){ .plist { grid-template-columns:1fr; } }
+
   /* ── 탄소중립 사업 상세(지도 영역 패널) ──────── */
   #carbonPanel { position:absolute; inset:12px; z-index:25; background:#fff; border-radius:12px;
     box-shadow:0 6px 28px rgba(0,0,0,.3); padding:22px 26px; overflow-y:auto; display:none; }
@@ -706,20 +717,16 @@ function renderCarbon(){
     ${['건물','수송','폐기물','흡수원','전환','기후변화적응'].map(sec=>{
       const list = CARBON.projects.filter(p=>p.sector===sec);
       if (!list.length) return '';
-      return `<div style="font-size:12px;font-weight:700;color:#9db3cc;margin:10px 0 5px">■ ${sec} 부문 (${list.length})</div>` +
-        list.map(p=>`
-          <div class="pj" data-pj="${CARBON.projects.indexOf(p)}">
-            <span class="pid">${p.id}</span>${p.name}
-          </div>`).join('');
+      return `<div class="cm" data-sector="${sec}">■ ${sec} 부문 <span style="font-weight:400;color:#9db3cc">(${list.length})</span></div>`;
     }).join('')}`;
 
   // 상단 메뉴 클릭 → 오른쪽 대시보드
-  document.querySelectorAll('#tabCarbon .cm').forEach(el=>{
+  document.querySelectorAll('#tabCarbon .cm[data-sec]').forEach(el=>{
     el.onclick = ()=>{ setActiveMenu(el); showCarbonSection(el.dataset.sec); };
   });
-  // 사업 클릭 → 오른쪽 상세 대시보드
-  document.querySelectorAll('#tabCarbon .pj').forEach(el=>{
-    el.onclick = ()=>{ setActiveMenu(el); showCarbonDetail(CARBON.projects[+el.dataset.pj]); };
+  // 부문 클릭 → 오른쪽에 사업 목록 대시보드
+  document.querySelectorAll('#tabCarbon .cm[data-sector]').forEach(el=>{
+    el.onclick = ()=>{ setActiveMenu(el); showSectorList(el.dataset.sector); };
   });
   // 탭 진입 시 기본으로 개요 대시보드 표시
   const first = document.querySelector('#tabCarbon .cm');
@@ -829,12 +836,35 @@ function showCarbonSection(key){
   document.getElementById('carbonPanel').style.display='block';
 }
 
+// ── 부문별 사업 목록 (지도 영역 패널) ─────────────────
+function showSectorList(sec){
+  const list = CARBON.projects.filter(p=>p.sector===sec);
+  const totalRed = list.reduce((s,p)=>s+(p.reduction||0),0);
+  document.getElementById('cpBody').innerHTML = `
+    <h2>■ ${sec} 부문 세부사업</h2>
+    <div class="cpsub">${list.length}개 사업 · 2030 감축목표 합계 ${totalRed?fmt(totalRed)+' tCO₂eq':'정성사업 중심'}</div>
+    <div class="plist">
+      ${list.map(p=>`
+        <div class="pli" data-pj="${CARBON.projects.indexOf(p)}">
+          <div class="plit"><span class="pid">${p.id}</span> ${p.name}</div>
+          <div class="plim">${p.type}${p.reduction?` · 감축목표 ${fmt(p.reduction)} tCO₂eq`:' · 정성사업'}</div>
+        </div>`).join('')}
+    </div>
+    <div class="dnote" style="margin-top:12px">사업을 클릭하면 세부 내용이 표시됩니다.</div>`;
+  // 목록에서 사업 클릭 → 상세 (뒤로가기 포함)
+  document.querySelectorAll('#cpBody .pli').forEach(el=>{
+    el.onclick = ()=>showCarbonDetail(CARBON.projects[+el.dataset.pj], sec);
+  });
+  document.getElementById('carbonPanel').style.display='block';
+}
+
 // ── 세부사업 상세 (지도 영역 패널) ────────────────────
-function showCarbonDetail(p){
+function showCarbonDetail(p, fromSector){
   const d = p.detail;
   const years = [2026,2027,2028,2029,2030];
   const maxY = p.yearly ? Math.max(...p.yearly, 1) : 1;
   document.getElementById('cpBody').innerHTML = `
+    ${fromSector?`<div class="backlink" id="cpBack">← ${fromSector} 부문 목록으로</div>`:''}
     <h2>${p.id}. ${p.name}</h2>
     <span class="ptag">${p.sector} 부문</span><span class="ptag" style="background:#eef2f7;color:#445">${p.type}</span>
     <div class="kpi" style="max-width:420px">
@@ -857,6 +887,9 @@ function showCarbonDetail(p){
         <div class="cyr"><span class="cl">${y}</span>
         <span class="cb" style="width:${Math.max(2,300*p.yearly[i]/maxY)}px"></span>
         <span class="cv">${p.yearly[i]?fmt(p.yearly[i]):'-'}</span></div>`).join('')}` : ''}`;
+  // 뒤로가기 → 부문 목록으로 복귀
+  const back = document.getElementById('cpBack');
+  if (back) back.onclick = ()=>showSectorList(fromSector);
   document.getElementById('carbonPanel').style.display='block';
 }
 document.getElementById('cpClose').onclick = ()=>document.getElementById('carbonPanel').style.display='none';
