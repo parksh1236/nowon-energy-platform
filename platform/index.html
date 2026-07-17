@@ -131,6 +131,17 @@
   .dnote { font-size:11px; color:#889; margin-top:6px; }
   @media (max-width:1100px){ .dgrid2,.dgrid3 { grid-template-columns:1fr; } }
 
+  /* ── MRV 계산기 ─────────────────────────────── */
+  .calcbox { display:flex; gap:8px; align-items:center; margin:12px 0; flex-wrap:wrap; }
+  .calcbox select { flex:1; min-width:220px; padding:9px 10px; font-size:13px; border:1px solid #cfd8e3; border-radius:8px; background:#fff; color:#223; }
+  .calcbox input { width:150px; padding:9px 10px; font-size:13px; border:1px solid #cfd8e3; border-radius:8px; }
+  .calcunit { font-size:12.5px; color:#667; min-width:32px; }
+  .calcbox button { padding:9px 22px; font-size:13px; font-weight:700; border:none; border-radius:8px; background:#0b8a5f; color:#fff; cursor:pointer; }
+  .calcbox button:hover { background:#0a7a54; }
+  .calcout { min-height:20px; margin-bottom:4px; }
+  .calcres { font-size:26px; font-weight:800; color:#0b8a5f; margin:6px 0 4px; }
+  .calcres small { font-size:14px; color:#667; font-weight:600; }
+
   /* ── 대시보드 사업 목록/뒤로가기 ─────────────── */
   .plist { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
   .pli { background:#f8fafc; border:1px solid #e4eaf0; border-radius:10px; padding:11px 14px; cursor:pointer; }
@@ -718,7 +729,9 @@ function renderCarbon(){
       const list = CARBON.projects.filter(p=>p.sector===sec);
       if (!list.length) return '';
       return `<div class="cm" data-sector="${sec}">■ ${sec} 부문 <span style="font-weight:400;color:#9db3cc">(${list.length})</span></div>`;
-    }).join('')}`;
+    }).join('')}
+    <div class="sec" style="margin-top:16px">🧮 MRV</div>
+    <div class="cm" data-sec="mrv">🧮 MRV 측정·검증·계산</div>`;
 
   // 상단 메뉴 클릭 → 오른쪽 대시보드
   document.querySelectorAll('#tabCarbon .cm[data-sec]').forEach(el=>{
@@ -817,6 +830,41 @@ function showCarbonSection(key){
         <span class="cv">${fmt(x.reduction)} tCO₂eq</span></div>`).join('')}`;
   }
 
+  if (key === 'mrv'){
+    const m = CARBON.mrv;
+    html = `
+      <h2>🧮 MRV 측정 · 검증 · 계산</h2>
+      <div class="cpsub">Measurement(측정) · Reporting(보고) · Verification(검증)</div>
+      <div class="dquote" style="margin-top:12px">${m.intro}</div>
+      <div class="dgrid3" style="margin-top:14px">
+        ${m.steps.map(s=>`
+          <div class="dphase">
+            <div class="dpname">${s.k}</div>
+            <div class="dpyear">${s.t}</div>
+            <div style="font-size:12px;color:#334;line-height:1.6">${s.d}</div>
+          </div>`).join('')}
+      </div>
+
+      <div class="dsec">감축량 계산기</div>
+      <div class="dnote">감축수단을 선택하고 활동량을 입력하면 「지자체 온실가스 감축사업별 감축원단위 적용 가이드라인」(2024, 한국환경공단) 원단위로 감축량을 계산합니다.</div>
+      <div class="calcbox">
+        <select id="calcFactor">
+          ${m.factors.map((f,i)=>`<option value="${i}">${f.name} (${f.factor} tCO₂eq/${f.unit})</option>`).join('')}
+        </select>
+        <input id="calcVal" type="number" min="0" placeholder="활동량 입력">
+        <span id="calcUnit" class="calcunit">㎡</span>
+        <button id="calcBtn">계산</button>
+      </div>
+      <div id="calcOut" class="calcout"></div>
+
+      <div class="dsec">주요 감축원단위</div>
+      <table class="dt">
+        <tr><th style="width:auto">감축수단</th><th style="width:auto">원단위 (tCO₂eq)</th><th style="width:auto">근거</th></tr>
+        ${m.factors.map(f=>`<tr><td>${f.name}</td><td>${f.factor} / ${f.unit}</td><td>${f.note}</td></tr>`).join('')}
+      </table>
+      <div class="dnote" style="margin-top:8px">사업별 정량지표와 산출식은 각 부문 → 세부사업 상세에서 확인할 수 있습니다.</div>`;
+  }
+
   if (key === 'roadmap'){
     html = `
       <h2>🗓️ 단계별 추진 계획 (2026~2030)</h2>
@@ -833,6 +881,30 @@ function showCarbonSection(key){
   }
 
   document.getElementById('cpBody').innerHTML = html;
+
+  // MRV 계산기 동작 연결
+  if (key === 'mrv'){
+    const sel = document.getElementById('calcFactor');
+    const val = document.getElementById('calcVal');
+    const unit = document.getElementById('calcUnit');
+    const out = document.getElementById('calcOut');
+    const upd = ()=>{ unit.textContent = CARBON.mrv.factors[+sel.value].unit; };
+    sel.onchange = upd; upd();
+    const run = ()=>{
+      const f = CARBON.mrv.factors[+sel.value];
+      const v = parseFloat(val.value);
+      if (isNaN(v) || v<0){ out.innerHTML='<span style="color:#c0392b">활동량을 숫자로 입력해 주세요.</span>'; return; }
+      const r = v * f.factor;
+      out.innerHTML = `
+        <div class="calcres">${r.toLocaleString('ko-KR',{maximumFractionDigits:2})} <small>tCO₂eq</small></div>
+        <div class="dnote">${f.name} : ${v.toLocaleString()} ${f.unit} × ${f.factor} tCO₂eq/${f.unit}
+        &nbsp;·&nbsp; 30년생 소나무 약 ${Math.round(r/0.01459).toLocaleString()}그루의 연간 흡수량에 해당</div>
+        <div class="dnote">※ 산정 결과는 계획 수립용 추정치입니다. 실적 인정을 위해서는 계측 데이터 기반 보고와 제3자 검증 절차가 필요합니다.</div>`;
+    };
+    document.getElementById('calcBtn').onclick = run;
+    val.onkeydown = e=>{ if(e.key==='Enter') run(); };
+  }
+
   document.getElementById('carbonPanel').style.display='block';
 }
 
@@ -882,6 +954,14 @@ function showCarbonDetail(p, fromSector){
       <tr><th>사업내용</th><td>${p.desc||''}</td></tr>
       ${p.roadmap?`<tr><th>추진 일정</th><td>${p.roadmap}</td></tr>`:''}
     </table>`}
+    ${p.mrv ? `<h3 style="font-size:13.5px;color:#0f2540;margin:16px 0 8px">🧮 MRV · 정량지표</h3>
+    <table class="dt">
+      <tr><th>MRV 유형</th><td>${p.mrv.mrvType}</td></tr>
+      ${p.mrv.indicator?`<tr><th>정량지표</th><td>${p.mrv.indicator}</td></tr>`:''}
+      ${p.mrv.formula?`<tr><th>산출식</th><td>${p.mrv.formula}</td></tr>`:''}
+      ${p.mrv.method?`<tr><th>적용 방법론</th><td>${p.mrv.method}</td></tr>`:''}
+      ${p.mrv.note?`<tr><th>비고</th><td>${p.mrv.note}</td></tr>`:''}
+    </table>` : ''}
     ${p.yearly ? `<h3 style="font-size:13.5px;color:#0f2540;margin:16px 0 8px">연차별 누적 감축목표 (tCO₂eq)</h3>
       ${years.map((y,i)=>`
         <div class="cyr"><span class="cl">${y}</span>
