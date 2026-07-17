@@ -140,6 +140,8 @@
   .calcbox button:hover { background:#0a7a54; }
   .calcout { min-height:20px; margin-bottom:4px; }
   .calcres { font-size:26px; font-weight:800; color:#0b8a5f; margin:6px 0 4px; }
+  .calcdel { color:#c0392b; cursor:pointer; font-weight:700; }
+  .calcdel:hover { opacity:.7; }
   .calcres small { font-size:14px; color:#667; font-weight:600; }
 
   /* ── 대시보드 사업 목록/뒤로가기 ─────────────── */
@@ -846,18 +848,21 @@ function showCarbonSection(key){
       </div>
 
       <div class="dsec">감축량 계산기</div>
-      <div class="dnote">감축수단을 선택하고 활동량을 입력하면 「지자체 온실가스 감축사업별 감축원단위 적용 가이드라인」(2024, 한국환경공단) 원단위로 감축량을 계산합니다.</div>
+      <div class="dnote">${m.catalogNote}<br>부문 → 감축사업 → 산정기준을 선택하고 활동량을 입력한 뒤 [추가]를 누르세요. 여러 사업을 추가하면 합계가 자동 계산됩니다.</div>
       <div class="calcbox">
-        <select id="calcFactor">
-          ${m.factors.map((f,i)=>`<option value="${i}">${f.name} (${f.factor} tCO₂eq/${f.unit})</option>`).join('')}
-        </select>
-        <input id="calcVal" type="number" min="0" placeholder="활동량 입력">
-        <span id="calcUnit" class="calcunit">㎡</span>
-        <button id="calcBtn">계산</button>
+        <select id="calcSec" style="flex:0 0 130px"></select>
+        <select id="calcMeasure"></select>
       </div>
+      <div class="calcbox">
+        <select id="calcEntry" style="flex:0 0 260px"></select>
+        <input id="calcVal" type="number" min="0" placeholder="활동량 입력">
+        <span id="calcUnit" class="calcunit"></span>
+        <button id="calcBtn">➕ 추가</button>
+      </div>
+      <div id="calcList"></div>
       <div id="calcOut" class="calcout"></div>
 
-      <div class="dsec">주요 감축원단위</div>
+      <div class="dsec">노원구 계획 주요 감축원단위</div>
       <table class="dt">
         <tr><th style="width:auto">감축수단</th><th style="width:auto">원단위 (tCO₂eq)</th><th style="width:auto">근거</th></tr>
         ${m.factors.map(f=>`<tr><td>${f.name}</td><td>${f.factor} / ${f.unit}</td><td>${f.note}</td></tr>`).join('')}
@@ -882,27 +887,80 @@ function showCarbonSection(key){
 
   document.getElementById('cpBody').innerHTML = html;
 
-  // MRV 계산기 동작 연결
+  // MRV 계산기 동작 연결 (부문 → 사업 → 산정기준, 다중 항목 합산)
   if (key === 'mrv'){
-    const sel = document.getElementById('calcFactor');
-    const val = document.getElementById('calcVal');
+    const cat = CARBON.mrv.catalog;
+    const selS = document.getElementById('calcSec');
+    const selM = document.getElementById('calcMeasure');
+    const selE = document.getElementById('calcEntry');
+    const val  = document.getElementById('calcVal');
     const unit = document.getElementById('calcUnit');
-    const out = document.getElementById('calcOut');
-    const upd = ()=>{ unit.textContent = CARBON.mrv.factors[+sel.value].unit; };
-    sel.onchange = upd; upd();
-    const run = ()=>{
-      const f = CARBON.mrv.factors[+sel.value];
-      const v = parseFloat(val.value);
-      if (isNaN(v) || v<0){ out.innerHTML='<span style="color:#c0392b">활동량을 숫자로 입력해 주세요.</span>'; return; }
-      const r = v * f.factor;
+    const out  = document.getElementById('calcOut');
+    const listEl = document.getElementById('calcList');
+
+    // 부문 목록 채우기
+    const secs = [...new Set(cat.map(c=>c.section))];
+    selS.innerHTML = secs.map(s=>`<option value="${s}">${s}</option>`).join('');
+
+    // 부문 선택 → 사업 목록 갱신
+    function fillMeasures(){
+      const list = cat.filter(c=>c.section===selS.value);
+      selM.innerHTML = list.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
+      fillEntries();
+    }
+    // 사업 선택 → 산정기준(원단위) 목록 갱신
+    function curMeasure(){ return cat.filter(c=>c.section===selS.value)[+selM.value]; }
+    function fillEntries(){
+      const ms = curMeasure();
+      selE.innerHTML = ms.entries.map((e,i)=>
+        `<option value="${i}">${e.label?e.label+' — ':''}${e.value} tCO₂eq/${e.unit}</option>`).join('');
+      updUnit();
+    }
+    function updUnit(){ unit.textContent = curMeasure().entries[+selE.value].unit; }
+    selS.onchange = fillMeasures;
+    selM.onchange = fillEntries;
+    selE.onchange = updUnit;
+    fillMeasures();
+
+    // 추가된 계산 항목 목록과 합계
+    if (!window.calcItems) window.calcItems = [];
+    function renderList(){
+      if (!calcItems.length){ listEl.innerHTML=''; out.innerHTML=''; return; }
+      const total = calcItems.reduce((s,it)=>s+it.result,0);
+      listEl.innerHTML = `
+        <table class="dt" style="margin-top:10px">
+          <tr><th style="width:auto">부문</th><th style="width:auto">감축사업 (산정기준)</th>
+              <th style="width:auto">활동량</th><th style="width:auto">원단위</th>
+              <th style="width:auto">감축량 (tCO₂eq)</th><th style="width:34px"></th></tr>
+          ${calcItems.map((it,i)=>`
+            <tr><td>${it.section}</td><td>${it.name}${it.label?` (${it.label})`:''}</td>
+            <td>${it.value.toLocaleString()} ${it.unit}</td><td>${it.factor}</td>
+            <td><b>${it.result.toLocaleString('ko-KR',{maximumFractionDigits:2})}</b></td>
+            <td style="text-align:center"><span class="calcdel" data-i="${i}">✕</span></td></tr>`).join('')}
+        </table>`;
       out.innerHTML = `
-        <div class="calcres">${r.toLocaleString('ko-KR',{maximumFractionDigits:2})} <small>tCO₂eq</small></div>
-        <div class="dnote">${f.name} : ${v.toLocaleString()} ${f.unit} × ${f.factor} tCO₂eq/${f.unit}
-        &nbsp;·&nbsp; 30년생 소나무 약 ${Math.round(r/0.01459).toLocaleString()}그루의 연간 흡수량에 해당</div>
+        <div class="calcres">합계 ${total.toLocaleString('ko-KR',{maximumFractionDigits:2})} <small>tCO₂eq</small></div>
+        <div class="dnote">30년생 소나무 약 ${Math.round(total/0.01459).toLocaleString()}그루의 연간 흡수량에 해당
+        &nbsp;·&nbsp; 승용차 약 ${Math.round(total/2.29).toLocaleString()}대의 연간 배출량에 해당</div>
         <div class="dnote">※ 산정 결과는 계획 수립용 추정치입니다. 실적 인정을 위해서는 계측 데이터 기반 보고와 제3자 검증 절차가 필요합니다.</div>`;
+      listEl.querySelectorAll('.calcdel').forEach(el=>{
+        el.onclick = ()=>{ calcItems.splice(+el.dataset.i,1); renderList(); };
+      });
+    }
+    renderList();   // 탭 재진입 시 기존 항목 복원
+
+    const add = ()=>{
+      const ms = curMeasure();
+      const e = ms.entries[+selE.value];
+      const v = parseFloat(val.value);
+      if (isNaN(v) || v<=0){ out.innerHTML='<span style="color:#c0392b">활동량을 숫자로 입력해 주세요.</span>'; return; }
+      calcItems.push({section:ms.section, name:ms.name, label:e.label, unit:e.unit,
+                      factor:e.value, value:v, result:v*e.value});
+      val.value='';
+      renderList();
     };
-    document.getElementById('calcBtn').onclick = run;
-    val.onkeydown = e=>{ if(e.key==='Enter') run(); };
+    document.getElementById('calcBtn').onclick = add;
+    val.onkeydown = e=>{ if(e.key==='Enter') add(); };
   }
 
   document.getElementById('carbonPanel').style.display='block';
