@@ -732,8 +732,8 @@ function renderCarbon(){
       if (!list.length) return '';
       return `<div class="cm" data-sector="${sec}">■ ${sec} 부문 <span style="font-weight:400;color:#9db3cc">(${list.length})</span></div>`;
     }).join('')}
-    <div class="sec" style="margin-top:16px">🧮 MRV</div>
-    <div class="cm" data-sec="mrv">🧮 MRV 측정·검증·계산</div>`;
+    <div class="sec" style="margin-top:16px">🧮 온실가스 계산기</div>
+    <div class="cm" data-sec="mrv">🧮 온실가스 계산기</div>`;
 
   // 상단 메뉴 클릭 → 오른쪽 대시보드
   document.querySelectorAll('#tabCarbon .cm[data-sec]').forEach(el=>{
@@ -835,18 +835,7 @@ function showCarbonSection(key){
   if (key === 'mrv'){
     const m = CARBON.mrv;
     html = `
-      <h2>🧮 MRV 측정 · 검증 · 계산</h2>
-      <div class="cpsub">Measurement(측정) · Reporting(보고) · Verification(검증)</div>
-      <div class="dquote" style="margin-top:12px">${m.intro}</div>
-      <div class="dgrid3" style="margin-top:14px">
-        ${m.steps.map(s=>`
-          <div class="dphase">
-            <div class="dpname">${s.k}</div>
-            <div class="dpyear">${s.t}</div>
-            <div style="font-size:12px;color:#334;line-height:1.6">${s.d}</div>
-          </div>`).join('')}
-      </div>
-
+      <h2>🧮 온실가스 계산기</h2>
       <div class="dsec">감축량 계산기</div>
       <div class="dnote">${m.catalogNote}<br>부문 → 감축사업 → 산정기준을 선택하고 활동량을 입력한 뒤 [추가]를 누르세요. 여러 사업을 추가하면 합계가 자동 계산됩니다.</div>
       <div class="calcbox">
