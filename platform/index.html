@@ -805,33 +805,62 @@ document.getElementById('sunPrev').onclick = ()=>{ sunTime.value=Math.max(6,Numb
 document.getElementById('sunNext').onclick = ()=>{ sunTime.value=Math.min(18,Number(sunTime.value)+.5); applySunAnalysis(); };
 sunPlay.onclick = ()=>toggleSunPlayback();
 
+// 노원구청 좌표 (coords.json 지오코딩 값과 동일) — 3D 지도 기본 시점 중심
+const NOWON_OFFICE = { lon: 127.05666, lat: 37.65417 };
+const NOWON_LOOK_HEIGHT = 1000; // 내려다보는 높이(m): 노원구청 상공 약 1km
+
+// VWorld의 initPosition/setInitPosition 옵션은 실제 카메라에 반영되지 않는 경우가 있어
+// (내부적으로 엉뚱한 기본 홈 좌표로 초기화됨), Cesium 뷰어가 준비된 뒤 camera.setView로
+// 직접 노원구 상공으로 이동시켜야 확실하게 원하는 위치·고도가 적용된다.
+function flyToNowon(){
+  const viewer = window.ws3d && window.ws3d.viewer;
+  if (!viewer || !window.Cesium) return false;
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(NOWON_OFFICE.lon, NOWON_OFFICE.lat, NOWON_LOOK_HEIGHT),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-35), roll: 0 }
+  });
+  viewer.scene.requestRender();
+  return true;
+}
+
 function loadVWorld(){
   if (vworldMap) { vworldStatus.style.display='none'; return Promise.resolve(); }
   if (vworldLoading) return vworldLoading;
   vworldLoading = new Promise((resolve, reject)=>{
     const startMap = ()=>{
       try {
+        // initPosition은 VWorld가 내부 3D(Cesium) 뷰어를 부트스트랩하는 데 필요하다.
+        // 다만 이 값이 실제 카메라에 그대로 반영되지는 않아(내부적으로 다른 기본 홈
+        // 좌표로 어긋나는 경우가 있음), 아래 waitForViewer()에서 Cesium API로 다시 덮어쓴다.
         const initPosition = new vw.CameraPosition(
-          new vw.CoordZ(127.0568, 37.6543, 650),
-          new vw.Direction(0, -30, 0)
+          new vw.CoordZ(NOWON_OFFICE.lon, NOWON_OFFICE.lat, NOWON_LOOK_HEIGHT),
+          new vw.Direction(0, -35, 0)
         );
-        const options = {
-          mapId: 'vworldMap',
-          initPosition,
-          logo: true,
-          navigation: true
-        };
+        const options = { mapId: 'vworldMap', initPosition, logo: true, navigation: true };
         vworldMap = new vw.Map();
         vworldMap.setOption(options);
         vworldMap.setMapId('vworldMap');
         vworldMap.setInitPosition(initPosition);
         vworldMap.start();
-        // VWorld 기본 3D 건물 레이어를 켜야 태양광에 따른 건물 그림자가 렌더링된다.
+        // VWorld 기본 3D 건물 레이어(LoD4)를 켜야 태양광에 따른 건물 그림자가 렌더링된다.
         const buildingLayer = vworldMap.getLayerElement && vworldMap.getLayerElement('facility_build');
         if (buildingLayer && buildingLayer.show) buildingLayer.show();
-        applySunAnalysis();
-        vworldStatus.style.display='none';
-        resolve();
+
+        // ws3d.viewer(Cesium 뷰어)는 map.start() 이후 비동기로 준비되므로 폴링 후 카메라 이동
+        let camAttempts = 0;
+        const waitForViewer = ()=>{
+          if (flyToNowon()){
+            applySunAnalysis();
+            vworldStatus.style.display='none';
+            // VWorld 자체의 initPosition 애니메이션이 시점을 예측 불가한 타이밍에 뒤늦게
+            // 덮어쓰는 경우가 있어, 여러 시점에 다시 덮어써 최종 위치를 확실히 고정한다.
+            [400, 900, 1600, 2800, 4500].forEach(ms => setTimeout(flyToNowon, ms));
+            return resolve();
+          }
+          if (++camAttempts >= 100) return reject(new Error('VWorld 3D 뷰어 초기화 시간이 초과되었습니다.'));
+          setTimeout(waitForViewer, 100);
+        };
+        waitForViewer();
       } catch (err) { reject(err); }
     };
     // VWorld SDK는 로더가 추가 모듈을 비동기로 불러오므로 vw 전역 객체를 기다린다.
