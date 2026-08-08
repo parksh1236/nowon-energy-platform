@@ -19,6 +19,8 @@
   #solarPanel h2 { font-size:13px; margin-bottom:4px; }
   #solarPanel p { font-size:10.5px; color:#b9c9db; line-height:1.45; margin-bottom:9px; }
   #solarPanel label { display:block; font-size:10.5px; color:#b9c9db; margin:7px 0 4px; }
+  #solarPanel .suncheck { display:flex; align-items:center; gap:5px; margin:6px 0 10px; color:#fff; font-size:12px; cursor:pointer; }
+  #solarPanel .suncheck input { accent-color:#f7c948; }
   #solarPanel input[type="date"] { width:100%; padding:6px 7px; border:1px solid rgba(255,255,255,.28); border-radius:5px; background:#16304f; color:#fff; font:12px inherit; }
   #solarPanel input[type="range"] { width:100%; accent-color:#f7c948; }
   .sunrow { display:flex; align-items:center; gap:6px; }
@@ -249,6 +251,7 @@
     <section id="solarPanel" aria-label="일조권 분석">
       <h2>☀️ 일조권 분석 · 시간별 그림자</h2>
       <p>날짜와 시간을 바꾸면 VWorld 3D 지도의 태양광·건물 그림자가 함께 갱신됩니다.</p>
+      <label class="suncheck"><input id="shadowEnabled" type="checkbox" checked> 그림자 표시</label>
       <label for="sunDate">분석 날짜</label>
       <input id="sunDate" type="date">
       <label for="sunTime">분석 시간</label>
@@ -742,6 +745,7 @@ const sunDate = document.getElementById('sunDate');
 const sunTime = document.getElementById('sunTime');
 const sunTimeLabel = document.getElementById('sunTimeLabel');
 const sunPlay = document.getElementById('sunPlay');
+const shadowEnabled = document.getElementById('shadowEnabled');
 sunDate.value = new Date().toLocaleDateString('en-CA');
 
 function setMainMap(mode){
@@ -769,13 +773,14 @@ function applySunAnalysis(){
   const viewer = window.ws3d && window.ws3d.viewer;
   const api = window.ws3d && window.ws3d.common;
   if (!viewer || !api || !api.JulianDate) return;
+  const enabled = shadowEnabled.checked;
   viewer.clock.currentTime = api.JulianDate.fromDate(getSunDateTime());
   viewer.clock.shouldAnimate = false;
-  viewer.shadows = true;
+  viewer.shadows = enabled;
   if (viewer.scene && viewer.scene.globe){
     viewer.scene.globe.enableLighting = true;
-    if (api.ShadowMode) viewer.terrainShadows = api.ShadowMode.ENABLED;
-    if (viewer.scene.shadowMap) viewer.scene.shadowMap.enabled = true;
+    if (api.ShadowMode) viewer.terrainShadows = enabled ? api.ShadowMode.ENABLED : api.ShadowMode.DISABLED;
+    if (viewer.scene.shadowMap) viewer.scene.shadowMap.enabled = enabled;
     viewer.scene.requestRender();
   }
 }
@@ -795,6 +800,7 @@ function toggleSunPlayback(force){
 }
 sunDate.onchange = applySunAnalysis;
 sunTime.oninput = applySunAnalysis;
+shadowEnabled.onchange = applySunAnalysis;
 document.getElementById('sunPrev').onclick = ()=>{ sunTime.value=Math.max(6,Number(sunTime.value)-.5); applySunAnalysis(); };
 document.getElementById('sunNext').onclick = ()=>{ sunTime.value=Math.min(18,Number(sunTime.value)+.5); applySunAnalysis(); };
 sunPlay.onclick = ()=>toggleSunPlayback();
