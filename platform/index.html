@@ -14,6 +14,18 @@
   #vworldMap { position:absolute; inset:0; z-index:40; display:none; background:#e9eef4; }
   #vworldStatus { position:absolute; top:14px; left:14px; z-index:41; display:none; padding:9px 12px; border-radius:8px;
     background:rgba(15,37,64,.92); color:#fff; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+  #solarPanel { position:absolute; top:14px; left:14px; z-index:60; display:none; width:254px; padding:13px;
+    border-radius:10px; background:rgba(15,37,64,.94); color:#fff; box-shadow:0 3px 16px rgba(0,0,0,.3); }
+  #solarPanel h2 { font-size:13px; margin-bottom:4px; }
+  #solarPanel p { font-size:10.5px; color:#b9c9db; line-height:1.45; margin-bottom:9px; }
+  #solarPanel label { display:block; font-size:10.5px; color:#b9c9db; margin:7px 0 4px; }
+  #solarPanel input[type="date"] { width:100%; padding:6px 7px; border:1px solid rgba(255,255,255,.28); border-radius:5px; background:#16304f; color:#fff; font:12px inherit; }
+  #solarPanel input[type="range"] { width:100%; accent-color:#f7c948; }
+  .sunrow { display:flex; align-items:center; gap:6px; }
+  .sunrow button { min-width:27px; height:26px; border:1px solid rgba(255,255,255,.3); border-radius:5px; background:#254767; color:#fff; font-size:13px; cursor:pointer; }
+  .sunrow button:hover { background:#356080; }
+  #sunTimeLabel { flex:1; text-align:center; font-size:18px; font-weight:800; color:#f7c948; font-variant-numeric:tabular-nums; }
+  #sunPlay { width:100%; margin-top:8px; padding:7px; border:0; border-radius:6px; background:#f7c948; color:#18324d; font-weight:800; font-size:12px; cursor:pointer; }
 
   /* ── 헤더 ───────────────────────────────────── */
   .hd { padding:16px 18px 12px; border-bottom:1px solid rgba(255,255,255,.12); }
@@ -234,6 +246,16 @@
   <div id="map">
     <div id="vworldMap" aria-label="VWorld 3D 지도"></div>
     <div id="vworldStatus">VWorld 3D 지도를 불러오는 중입니다…</div>
+    <section id="solarPanel" aria-label="일조권 분석">
+      <h2>☀️ 일조권 분석 · 시간별 그림자</h2>
+      <p>날짜와 시간을 바꾸면 VWorld 3D 지도의 태양광·건물 그림자가 함께 갱신됩니다.</p>
+      <label for="sunDate">분석 날짜</label>
+      <input id="sunDate" type="date">
+      <label for="sunTime">분석 시간</label>
+      <div class="sunrow"><button id="sunPrev" title="30분 전">−</button><strong id="sunTimeLabel">12:00</strong><button id="sunNext" title="30분 후">+</button></div>
+      <input id="sunTime" type="range" min="6" max="18" step="0.25" value="12">
+      <button id="sunPlay">▶ 시간별 그림자 재생</button>
+    </section>
     <div id="progress">주소 좌표 변환 중… <span id="pgTxt"></span></div>
     <div id="legend"></div>
     <div id="detail">
@@ -525,6 +547,7 @@ function render(){
 
   document.getElementById('cntInfo').textContent =
     `사용량 ${list.length}개소 (좌표 ${shown}) · 사용량없는 건물 ${noData.length}개소 (좌표 ${shownGray})`;
+  renderVWorldBuildingMarkers(list, noData, th);
   renderLegend(th);
   renderStats(list);
 }
@@ -707,6 +730,8 @@ document.getElementById('dclose').onclick = ()=>document.getElementById('detail'
 let CARBON = null;   // carbon.json 내용
 let vworldMap = null;
 let vworldLoading = null;
+let vworldEntities = [];
+let sunTimer = null;
 
 // 탭 전환 처리
 const btnE = document.getElementById('tabBtnEnergy');
@@ -714,14 +739,94 @@ const btnC = document.getElementById('tabBtnCarbon');
 const btnV = document.getElementById('tabBtnVWorld');
 const vworldEl = document.getElementById('vworldMap');
 const vworldStatus = document.getElementById('vworldStatus');
+const solarPanel = document.getElementById('solarPanel');
+const sunDate = document.getElementById('sunDate');
+const sunTime = document.getElementById('sunTime');
+const sunTimeLabel = document.getElementById('sunTimeLabel');
+const sunPlay = document.getElementById('sunPlay');
+sunDate.value = new Date().toLocaleDateString('en-CA');
 
 function setMainMap(mode){
   const isVWorld = mode === 'vworld';
   vworldEl.style.display = isVWorld ? 'block' : 'none';
   vworldStatus.style.display = isVWorld && !vworldMap ? 'block' : 'none';
+  solarPanel.style.display = isVWorld ? 'block' : 'none';
+  if (!isVWorld && sunTimer) toggleSunPlayback(false);
   if (!isVWorld) return;
   loadVWorld();
 }
+
+function getSunDateTime(){
+  const [year, month, day] = sunDate.value.split('-').map(Number);
+  const hour = Number(sunTime.value);
+  return new Date(year, month-1, day, Math.floor(hour), Math.round((hour % 1) * 60), 0);
+}
+function updateSunLabel(){
+  const hour = Number(sunTime.value);
+  sunTimeLabel.textContent = `${String(Math.floor(hour)).padStart(2,'0')}:${String(Math.round((hour % 1) * 60)).padStart(2,'0')}`;
+}
+function applySunAnalysis(){
+  updateSunLabel();
+  // VWorld WebGL 3.0은 Cesium 기반 엔진(ws3d)을 노출한다. 지도 시계와 그림자를 함께 갱신한다.
+  const viewer = window.ws3d && window.ws3d.viewer;
+  const api = window.ws3d && window.ws3d.common;
+  if (!viewer || !api || !api.JulianDate) return;
+  viewer.clock.currentTime = api.JulianDate.fromDate(getSunDateTime());
+  viewer.clock.shouldAnimate = false;
+  viewer.shadows = true;
+  if (viewer.scene && viewer.scene.globe){
+    viewer.scene.globe.enableLighting = true;
+    if (api.ShadowMode) viewer.terrainShadows = api.ShadowMode.ENABLED;
+    viewer.scene.requestRender();
+  }
+}
+
+// 카카오 지도와 동일한 필터·5분위 색상 기준으로 VWorld 3D 지도에도 건물 사용량을 표시한다.
+function renderVWorldBuildingMarkers(list, noData, thresholds){
+  const viewer = window.ws3d && window.ws3d.viewer;
+  const api = window.ws3d && window.ws3d.common;
+  if (!vworldMap || !viewer || !api || !viewer.entities || !api.Cartesian3 || !api.Color) return;
+  vworldEntities.forEach(entity=>viewer.entities.remove(entity));
+  vworldEntities=[];
+  const addMarker = (b, color, alpha)=>{
+    const c = coords[b.addr];
+    if (!c) return;
+    const entity = viewer.entities.add({
+      name: `${b.name || b.addr} · ${b.usage || '용도정보 없음'}`,
+      position: api.Cartesian3.fromDegrees(c.lng, c.lat, 2),
+      ellipse: {
+        semiMajorAxis:11, semiMinorAxis:11,
+        material:api.Color.fromCssColorString(color).withAlpha(alpha),
+        outline:true,
+        outlineColor:api.Color.fromCssColorString(color),
+        heightReference:api.HeightReference ? api.HeightReference.CLAMP_TO_GROUND : undefined
+      }
+    });
+    vworldEntities.push(entity);
+  };
+  list.forEach(b=>addMarker(b, GRADES[gradeOf(usageOf(b), thresholds)], .52));
+  noData.forEach(b=>addMarker(b, '#9ca3af', .55));
+  viewer.scene.requestRender();
+}
+function toggleSunPlayback(force){
+  const play = force === undefined ? !sunTimer : force;
+  if (!play){
+    clearInterval(sunTimer); sunTimer=null;
+    sunPlay.textContent='▶ 시간별 그림자 재생';
+    return;
+  }
+  sunPlay.textContent='❚❚ 재생 중지';
+  sunTimer = setInterval(()=>{
+    const next = Number(sunTime.value) + .25;
+    sunTime.value = next > 18 ? 6 : next;
+    applySunAnalysis();
+  }, 700);
+}
+sunDate.onchange = applySunAnalysis;
+sunTime.oninput = applySunAnalysis;
+document.getElementById('sunPrev').onclick = ()=>{ sunTime.value=Math.max(6,Number(sunTime.value)-.5); applySunAnalysis(); };
+document.getElementById('sunNext').onclick = ()=>{ sunTime.value=Math.min(18,Number(sunTime.value)+.5); applySunAnalysis(); };
+sunPlay.onclick = ()=>toggleSunPlayback();
 
 function loadVWorld(){
   if (vworldMap) { vworldStatus.style.display='none'; return Promise.resolve(); }
@@ -741,6 +846,8 @@ function loadVWorld(){
         vworldMap = new vw.Map();
         vworldMap.setOption(options);
         vworldMap.start();
+        applySunAnalysis();
+        render();
         vworldStatus.style.display='none';
         resolve();
       } catch (err) { reject(err); }
