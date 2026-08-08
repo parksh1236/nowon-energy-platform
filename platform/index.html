@@ -11,6 +11,9 @@
   #wrap { display:flex; height:100%; }
   #sidebar { width:360px; min-width:360px; background:#0f2540; color:#fff; display:flex; flex-direction:column; overflow:hidden; }
   #map { flex:1; position:relative; }
+  #vworldMap { position:absolute; inset:0; z-index:40; display:none; background:#e9eef4; }
+  #vworldStatus { position:absolute; top:14px; left:14px; z-index:41; display:none; padding:9px 12px; border-radius:8px;
+    background:rgba(15,37,64,.92); color:#fff; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.25); }
 
   /* ── 헤더 ───────────────────────────────────── */
   .hd { padding:16px 18px 12px; border-bottom:1px solid rgba(255,255,255,.12); }
@@ -179,6 +182,8 @@
   #searchResults .sr b { color:#4fd1a5; font-weight:700; }
   #searchResults .sr .sub2 { color:#9db3cc; font-size:11px; margin-top:1px; }
 </style>
+<!-- VWorld SDK는 내부 모듈을 document.write로 불러오므로 문서 파싱 중에 로드해야 합니다. -->
+<script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=EB2D5106-C922-3CDB-99E6-BC77DBBA1B87"></script>
 </head>
 <body>
 <div id="wrap">
@@ -188,6 +193,7 @@
       <h1>노원구 <span>에너지정보플랫폼</span></h1>
       <div class="tabs">
         <button id="tabBtnEnergy" class="on">⚡ 에너지정보</button>
+        <button id="tabBtnVWorld">🗺️ 3D 지도</button>
         <button id="tabBtnCarbon">🌱 탄소중립계획</button>
       </div>
     </div>
@@ -226,6 +232,8 @@
 
   <!-- 지도 -->
   <div id="map">
+    <div id="vworldMap" aria-label="VWorld 3D 지도"></div>
+    <div id="vworldStatus">VWorld 3D 지도를 불러오는 중입니다…</div>
     <div id="progress">주소 좌표 변환 중… <span id="pgTxt"></span></div>
     <div id="legend"></div>
     <div id="detail">
@@ -697,21 +705,84 @@ document.getElementById('dclose').onclick = ()=>document.getElementById('detail'
 // 탄소중립계획 탭
 // ══════════════════════════════════════════════════════
 let CARBON = null;   // carbon.json 내용
+let vworldMap = null;
+let vworldLoading = null;
 
 // 탭 전환 처리
 const btnE = document.getElementById('tabBtnEnergy');
 const btnC = document.getElementById('tabBtnCarbon');
+const btnV = document.getElementById('tabBtnVWorld');
+const vworldEl = document.getElementById('vworldMap');
+const vworldStatus = document.getElementById('vworldStatus');
+
+function setMainMap(mode){
+  const isVWorld = mode === 'vworld';
+  vworldEl.style.display = isVWorld ? 'block' : 'none';
+  vworldStatus.style.display = isVWorld && !vworldMap ? 'block' : 'none';
+  if (!isVWorld) return;
+  loadVWorld();
+}
+
+function loadVWorld(){
+  if (vworldMap) { vworldStatus.style.display='none'; return Promise.resolve(); }
+  if (vworldLoading) return vworldLoading;
+  vworldLoading = new Promise((resolve, reject)=>{
+    const startMap = ()=>{
+      try {
+        const options = {
+          mapId: 'vworldMap',
+          initPosition: new vw.CameraPosition(
+            new vw.CoordZ(127.0568, 37.6543, 3800),
+            new vw.Direction(0, -72, 0)
+          ),
+          logo: true,
+          navigation: true
+        };
+        vworldMap = new vw.Map();
+        vworldMap.setOption(options);
+        vworldMap.start();
+        vworldStatus.style.display='none';
+        resolve();
+      } catch (err) { reject(err); }
+    };
+    // VWorld SDK는 로더가 추가 모듈을 비동기로 불러오므로 vw 전역 객체를 기다린다.
+    let attempts = 0;
+    const waitForSdk = ()=>{
+      if (window.vw) return startMap();
+      if (++attempts >= 50) return reject(new Error('VWorld SDK 초기화 시간이 초과되었습니다.'));
+      setTimeout(waitForSdk, 100);
+    };
+    waitForSdk();
+  }).catch(err=>{
+    console.error(err);
+    vworldStatus.textContent = 'VWorld 3D 지도를 불러오지 못했습니다. 인증키와 허용 도메인을 확인해 주세요.';
+    vworldStatus.style.display='block';
+    vworldLoading = null;
+  });
+  return vworldLoading;
+}
+
 btnE.onclick = ()=>{
-  btnE.classList.add('on'); btnC.classList.remove('on');
+  btnE.classList.add('on'); btnV.classList.remove('on'); btnC.classList.remove('on');
   document.getElementById('tabEnergy').style.display='';
   document.getElementById('tabCarbon').style.display='none';
   document.getElementById('carbonPanel').style.display='none';   // 지도 다시 보이게
+  setMainMap('kakao');
+};
+btnV.onclick = ()=>{
+  btnV.classList.add('on'); btnE.classList.remove('on'); btnC.classList.remove('on');
+  document.getElementById('tabEnergy').style.display='';
+  document.getElementById('tabCarbon').style.display='none';
+  document.getElementById('detail').style.display='none';
+  document.getElementById('carbonPanel').style.display='none';
+  setMainMap('vworld');
 };
 btnC.onclick = ()=>{
-  btnC.classList.add('on'); btnE.classList.remove('on');
+  btnC.classList.add('on'); btnE.classList.remove('on'); btnV.classList.remove('on');
   document.getElementById('tabEnergy').style.display='none';
   document.getElementById('tabCarbon').style.display='block';
   document.getElementById('detail').style.display='none';        // 건물 상세 닫기
+  setMainMap('kakao');
   if (!CARBON){
     fetch('carbon.json').then(r=>r.json()).then(d=>{ CARBON=d; renderCarbon(); });
   } else {
