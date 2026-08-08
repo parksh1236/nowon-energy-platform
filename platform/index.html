@@ -1096,13 +1096,28 @@ function applySunAnalysis(){
   const viewer = window.ws3d && window.ws3d.viewer;
   if (!viewer || !window.Cesium){ diag('뷰어 준비 중…'); return; }
   const enabled = shadowEnabled.checked;
-  viewer.clock.currentTime = Cesium.JulianDate.fromDate(getSunDateTime());
+
+  // 시계를 지정 시각으로 고정 — start/stopTime을 그 시각 근처 1초로 좁혀야
+  // VWorld 내부 애니메이션 루프가 다른 시각으로 되돌리지 않는다.
+  const jd = Cesium.JulianDate.fromDate(getSunDateTime());
+  viewer.clock.currentTime = jd;
   viewer.clock.shouldAnimate = false;
+  viewer.clock.startTime = jd.clone();
+  const stop = jd.clone();
+  Cesium.JulianDate.addSeconds(stop, 1, stop);
+  viewer.clock.stopTime = stop;
+
+  // VWorld는 Cesium 표준 shadow 설정과 별개로 자체 setting.useSunLighting
+  // 마스터 스위치를 갖고 있어, 이걸 켜지 않으면 clock을 바꿔도 태양광·그림자가
+  // 전혀 갱신되지 않는다(그림자가 "표시는 되지만 움직이지 않던" 원인).
   viewer.shadows = enabled;
+  viewer.terrainShadows = enabled ? 1 : 0; // Cesium.ShadowMode.ENABLED/DISABLED
   viewer.scene.globe.enableLighting = enabled;
   if (viewer.scene.shadowMap) viewer.scene.shadowMap.enabled = enabled;
+  if (viewer.setting) viewer.setting.useSunLighting = enabled;
+
   viewer.scene.requestRender();
-  diag(`clock(UTC)=${viewer.clock.currentTime.toString()} · shadows=${viewer.shadows}`);
+  diag(`clock(UTC)=${viewer.clock.currentTime.toString()} · shadows=${viewer.shadows} · useSunLighting=${viewer.setting && viewer.setting.useSunLighting}`);
 }
 function toggleSunPlayback(force){
   const play = force === undefined ? !sunTimer : force;
@@ -1121,15 +1136,19 @@ document.getElementById('sunPrev').onclick = ()=>{ sunTime.value=Math.max(6,Numb
 document.getElementById('sunNext').onclick = ()=>{ sunTime.value=Math.min(18,Number(sunTime.value)+.5); applySunAnalysis(); };
 sunPlay.onclick = ()=>toggleSunPlayback();
 
-// 카메라를 노원구청 상공으로 이동. VWorld 자체 애니메이션이 뒤늦게 위치를
-// 덮어쓰는 경우가 있어 여러 시점에 재적용해 최종 위치를 확정한다.
+// 카메라를 노원구청 건물이 화면 중앙에 오도록 이동. VWorld 자체 애니메이션이
+// 뒤늦게 위치를 덮어쓰는 경우가 있어 여러 시점에 재적용해 최종 위치를 확정한다.
+// camera.setView(destination=좌표+고도)는 카메라 자체를 그 위치에 두고 정해진
+// 방향만 바라보게 할 뿐이라, 그 아래(정확히는 진행 방향 쪽) 땅이 화면에 나올 뿐
+// 노원구청 건물이 화면 중앙에 잡힌다는 보장이 없었다(그림자가 잘 안 보이던 원인).
+// camera.lookAt(대상, HeadingPitchRange)을 쓰면 항상 대상이 화면 중앙에 오도록
+// range(거리)만큼 떨어진 위치에서 바라보게 되어, 건물과 그림자가 확실히 프레임에 들어온다.
 function flyToNowon(){
   const viewer = window.ws3d && window.ws3d.viewer;
   if (!viewer || !window.Cesium) return false;
-  viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(NOWON_OFFICE.lon, NOWON_OFFICE.lat, NOWON_LOOK_HEIGHT),
-    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-35), roll: 0 }
-  });
+  const target = Cesium.Cartesian3.fromDegrees(NOWON_OFFICE.lon, NOWON_OFFICE.lat, 40); // 건물 높이 감안해 지면보다 약간 위
+  viewer.camera.lookAt(target, new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-35), NOWON_LOOK_HEIGHT));
+  viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY); // lookAt 이후 카메라 기준 좌표계를 원상복구(안 하면 이후 마우스 조작이 대상점 중심으로 고정돼버림)
   viewer.scene.requestRender();
   return true;
 }
