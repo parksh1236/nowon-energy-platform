@@ -721,10 +721,13 @@ function showDetail(b){
       <span class="br ${cls}" style="width:${v?Math.max(2,150*v/max):0}px"></span>
       <span class="vl">${v!==undefined?fmt(v)+' '+unit:'-'}</span></div>`;
   }).join('');
+  const c = coords[b.addr];
   document.getElementById('dbody').innerHTML = `
     <h2>${b.name?b.name+' — ':''}${b.addr}</h2>
     ${b.road?`<div class="road">${b.road}</div>`:''}
     ${b.usage?`<span class="tag">${b.usage}</span>`:'<span class="tag" style="background:#eee;color:#888">용도정보 없음</span>'}
+    ${c?`<a class="tag" style="background:#0b8a5f;color:#fff;cursor:pointer;text-decoration:none" target="_blank"
+        href="https://map.kakao.com/link/to/${encodeURIComponent(b.name||b.addr)},${c.lat},${c.lng}">🚗 길찾기</a>`:''}
     <div class="meta">
       ${b.gfa?`연면적 ${fmt(b.gfa)}㎡ · 건축면적 ${fmt(b.bdar||0)}㎡ · 대지면적 ${fmt(b.siar||0)}㎡`:''}
     </div>
