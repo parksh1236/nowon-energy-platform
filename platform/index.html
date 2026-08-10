@@ -42,7 +42,7 @@
 
   /* ── 상세 패널 ──────────────────────────────── */
   #detail { position:absolute; top:12px; right:48px; width:330px; max-height:calc(100% - 24px); overflow-y:auto;
-            background:#fff; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.25); padding:16px; display:none; z-index:20; }
+            background:#fff; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.25); padding:16px; display:none; z-index:65; }
   #detail h2 { font-size:15px; letter-spacing:-.4px; color:#0f2540; padding-right:24px; }
   #detail .road { font-size:11.5px; color:#667; margin-top:3px; }
   #detail .tag { display:inline-block; margin-top:8px; padding:3px 8px; font-size:11px; background:#e6f7f0; color:#0b8a5f; border-radius:20px; font-weight:700; }
@@ -704,10 +704,14 @@ function focusBuilding(addr){
   const b = DATA.buildings.find(x=>x.addr===addr);
   const c = coords[addr];
   if (!b || !c) return;
-  if (searchMarker) searchMarker.setMap(null);   // 이전 검색 마커 제거
-  const pos = new kakao.maps.LatLng(c.lat,c.lng);
-  map.setLevel(4); map.panTo(pos);
-  searchMarker = new kakao.maps.Marker({ map, position:pos, title:b.name||b.addr });
+  if (mainMapMode === 'vworld'){
+    flyToPoint(c.lng, c.lat, 200);
+  } else {
+    if (searchMarker) searchMarker.setMap(null);   // 이전 검색 마커 제거
+    const pos = new kakao.maps.LatLng(c.lat,c.lng);
+    map.setLevel(4); map.panTo(pos);
+    searchMarker = new kakao.maps.Marker({ map, position:pos, title:b.name||b.addr });
+  }
   showDetail(b);
 }
 
@@ -1151,15 +1155,16 @@ sunPlay.onclick = ()=>toggleSunPlayback();
 // 노원구청 건물이 화면 중앙에 잡힌다는 보장이 없었다(그림자가 잘 안 보이던 원인).
 // camera.lookAt(대상, HeadingPitchRange)을 쓰면 항상 대상이 화면 중앙에 오도록
 // range(거리)만큼 떨어진 위치에서 바라보게 되어, 건물과 그림자가 확실히 프레임에 들어온다.
-function flyToNowon(){
+function flyToPoint(lon, lat, range){
   const viewer = window.ws3d && window.ws3d.viewer;
   if (!viewer || !window.Cesium) return false;
-  const target = Cesium.Cartesian3.fromDegrees(NOWON_OFFICE.lon, NOWON_OFFICE.lat, 40); // 건물 높이 감안해 지면보다 약간 위
-  viewer.camera.lookAt(target, new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-35), NOWON_LOOK_HEIGHT));
+  const target = Cesium.Cartesian3.fromDegrees(lon, lat, 40); // 건물 높이 감안해 지면보다 약간 위
+  viewer.camera.lookAt(target, new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-35), range || 200));
   viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY); // lookAt 이후 카메라 기준 좌표계를 원상복구(안 하면 이후 마우스 조작이 대상점 중심으로 고정돼버림)
   viewer.scene.requestRender();
   return true;
 }
+function flyToNowon(){ return flyToPoint(NOWON_OFFICE.lon, NOWON_OFFICE.lat, NOWON_LOOK_HEIGHT); }
 
 function loadVWorld(){
   if (vworldMap) { vworldStatus.style.display='none'; return Promise.resolve(); }
@@ -1209,7 +1214,9 @@ function loadVWorld(){
   return vworldLoading;
 }
 
+let mainMapMode = 'kakao';
 function setMainMap(mode){
+  mainMapMode = mode;
   const isVWorld = mode === 'vworld';
   vworldEl.style.display = isVWorld ? 'block' : 'none';
   vworldStatus.style.display = isVWorld && !vworldMap ? 'block' : 'none';
