@@ -215,9 +215,17 @@
     </div>
     <div id="tabEnergy">
     <div class="ctrl" style="position:relative">
-      <label class="t">검색 (주소 · 건물명)</label>
+      <label class="t">검색 (주소 · 건물명) <button id="routeToggle" class="mini">🚗 길찾기</button></label>
       <input id="searchBox" type="text" placeholder="예: 상계동 666, 해링턴, 마들로 45" autocomplete="off">
       <div id="searchResults"></div>
+      <div id="routeBox" style="display:none;margin-top:8px">
+        <input id="routeFrom" type="text" placeholder="출발지 주소 또는 건물명" autocomplete="off"
+               style="width:100%;margin-bottom:6px;padding:8px 10px;font-size:12.5px;border-radius:6px;border:1px solid rgba(255,255,255,.25);background:#16304f;color:#fff">
+        <input id="routeToInput" type="text" placeholder="도착지 주소 또는 건물명" autocomplete="off"
+               style="width:100%;margin-bottom:6px;padding:8px 10px;font-size:12.5px;border-radius:6px;border:1px solid rgba(255,255,255,.25);background:#16304f;color:#fff">
+        <button id="routeGoBtn" style="width:100%;padding:8px;font-size:12.5px;font-weight:700;border:none;border-radius:6px;background:#0b8a5f;color:#fff;cursor:pointer">경로 표시</button>
+        <div id="sideRouteMsg" style="font-size:11px;color:#7fe3c0;margin-top:6px;line-height:1.6"></div>
+      </div>
     </div>
     <div class="ctrl">
       <label class="t">에너지 종류</label>
@@ -721,6 +729,39 @@ function focusBuilding(addr){
 function clearRoute(){
   if (routeLine){ routeLine.setMap(null); routeLine = null; }
 }
+// (fromLat,fromLng) → (toLat,toLng) 경로를 조회해 지도에 그리고 outEl에 결과 표시
+function fetchAndDrawRoute(fromLat, fromLng, toLat, toLng, label, outEl){
+  outEl.textContent = '경로 조회 중…';
+  fetch(`https://apis-navi.kakaomobility.com/v1/directions?origin=${fromLng},${fromLat}&destination=${toLng},${toLat}`,
+    { headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` } })
+    .then(r=>r.json())
+    .then(data=>{
+      const route = data.routes && data.routes[0];
+      if (!route || route.result_code !== 0){
+        outEl.textContent = '경로를 찾지 못했습니다. (' + (route?route.result_msg:'응답 없음') + ')';
+        return;
+      }
+      clearRoute();
+      const path = [];
+      route.sections.forEach(sec=>sec.roads.forEach(rd=>{
+        for (let i=0;i<rd.vertexes.length;i+=2){
+          path.push(new kakao.maps.LatLng(rd.vertexes[i+1], rd.vertexes[i]));
+        }
+      }));
+      routeLine = new kakao.maps.Polyline({
+        map, path, strokeWeight:5, strokeColor:'#2563eb', strokeOpacity:.85, strokeStyle:'solid'
+      });
+      const bounds = new kakao.maps.LatLngBounds();
+      path.forEach(p=>bounds.extend(p));
+      map.setBounds(bounds);
+      const km = (route.summary.distance/1000).toFixed(1);
+      const min = Math.round(route.summary.duration/60);
+      outEl.innerHTML = `🚗 ${label} 약 ${km}km · ${min}분 <span class="routeClearBtn" style="color:#c0392b;cursor:pointer;margin-left:6px">✕ 경로 지우기</span>`;
+      outEl.querySelector('.routeClearBtn').onclick = ()=>{ clearRoute(); outEl.textContent=''; };
+    })
+    .catch(()=>{ outEl.textContent = '경로 조회 중 오류가 발생했습니다.'; });
+}
+// 건물 상세 패널: 현재 위치 → 해당 건물
 function drawRouteTo(destLat, destLng, label){
   const out = document.getElementById('routeMsg');
   if (!navigator.geolocation){
@@ -729,38 +770,40 @@ function drawRouteTo(destLat, destLng, label){
   }
   out.textContent = '현재 위치 확인 중…';
   navigator.geolocation.getCurrentPosition(pos=>{
-    const from = { lng: pos.coords.longitude, lat: pos.coords.latitude };
-    out.textContent = '경로 조회 중…';
-    fetch(`https://apis-navi.kakaomobility.com/v1/directions?origin=${from.lng},${from.lat}&destination=${destLng},${destLat}`,
-      { headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` } })
-      .then(r=>r.json())
-      .then(data=>{
-        const route = data.routes && data.routes[0];
-        if (!route || route.result_code !== 0){
-          out.textContent = '경로를 찾지 못했습니다. (' + (route?route.result_msg:'응답 없음') + ')';
-          return;
-        }
-        clearRoute();
-        const path = [];
-        route.sections.forEach(sec=>sec.roads.forEach(rd=>{
-          for (let i=0;i<rd.vertexes.length;i+=2){
-            path.push(new kakao.maps.LatLng(rd.vertexes[i+1], rd.vertexes[i]));
-          }
-        }));
-        routeLine = new kakao.maps.Polyline({
-          map, path, strokeWeight:5, strokeColor:'#2563eb', strokeOpacity:.85, strokeStyle:'solid'
-        });
-        const bounds = new kakao.maps.LatLngBounds();
-        path.forEach(p=>bounds.extend(p));
-        map.setBounds(bounds);
-        const km = (route.summary.distance/1000).toFixed(1);
-        const min = Math.round(route.summary.duration/60);
-        out.innerHTML = `🚗 ${label} 까지 약 ${km}km · ${min}분 <span id="routeClear" style="color:#c0392b;cursor:pointer;margin-left:6px">✕ 경로 지우기</span>`;
-        document.getElementById('routeClear').onclick = ()=>{ clearRoute(); out.textContent=''; };
-      })
-      .catch(()=>{ out.textContent = '경로 조회 중 오류가 발생했습니다.'; });
+    fetchAndDrawRoute(pos.coords.latitude, pos.coords.longitude, destLat, destLng, label+' 까지', out);
   }, ()=>{ out.textContent = '현재 위치 권한을 허용해 주세요.'; });
 }
+// 주소·건물명 텍스트 → 좌표 (주소 검색 우선, 실패 시 키워드 검색)
+function geocodeText(q){
+  return new Promise((resolve,reject)=>{
+    geocoder.addressSearch(q, (result,status)=>{
+      if (status===kakao.maps.services.Status.OK && result[0]){
+        resolve({lat:+result[0].y, lng:+result[0].x});
+      } else if (places){
+        places.keywordSearch(q, (data,st)=>{
+          if (st===kakao.maps.services.Status.OK && data[0]) resolve({lat:+data[0].y, lng:+data[0].x});
+          else reject();
+        });
+      } else reject();
+    });
+  });
+}
+// 사이드바: 출발지·도착지 직접 입력 길찾기
+document.getElementById('routeToggle').onclick = ()=>{
+  const box = document.getElementById('routeBox');
+  box.style.display = box.style.display==='block' ? 'none' : 'block';
+  document.getElementById('searchResults').style.display='none';
+};
+document.getElementById('routeGoBtn').onclick = ()=>{
+  const fromQ = document.getElementById('routeFrom').value.trim();
+  const toQ = document.getElementById('routeToInput').value.trim();
+  const msg = document.getElementById('sideRouteMsg');
+  if (!fromQ || !toQ){ msg.textContent = '출발지·도착지를 모두 입력해 주세요.'; return; }
+  msg.textContent = '주소 확인 중…';
+  Promise.all([geocodeText(fromQ), geocodeText(toQ)]).then(([f,t])=>{
+    fetchAndDrawRoute(f.lat, f.lng, t.lat, t.lng, toQ+' 까지', msg);
+  }).catch(()=>{ msg.textContent = '주소를 찾을 수 없습니다.'; });
+};
 
 // ── 8) 건물 상세 패널 (월별 전기/가스 차트) ───────────
 function showDetail(b){
