@@ -703,7 +703,12 @@ function initSearch(){
 function focusBuilding(addr){
   const b = DATA.buildings.find(x=>x.addr===addr);
   const c = coords[addr];
-  if (b && c){ map.setLevel(4); map.panTo(new kakao.maps.LatLng(c.lat,c.lng)); showDetail(b); }
+  if (!b || !c) return;
+  if (searchMarker) searchMarker.setMap(null);   // 이전 검색 마커 제거
+  const pos = new kakao.maps.LatLng(c.lat,c.lng);
+  map.setLevel(4); map.panTo(pos);
+  searchMarker = new kakao.maps.Marker({ map, position:pos, title:b.name||b.addr });
+  showDetail(b);
 }
 
 // ── 8) 건물 상세 패널 (월별 전기/가스 차트) ───────────
