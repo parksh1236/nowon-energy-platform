@@ -287,6 +287,7 @@
 // 노원구 에너지정보플랫폼 메인 스크립트
 // ══════════════════════════════════════════════════════
 const KAKAO_KEY = 'd5eb9a066a7f486f605d8e200c63d65b';   // 카카오 JavaScript 키
+const KAKAO_REST_KEY = '527d9a63e5023c0db627b17df315ce74';  // 카카오모빌리티 길찾기용 REST API 키
 const CACHE_KEY = 'nowon_geocode_v1';                    // 좌표 캐시(localStorage)
 
 let DATA = null;          // data.json 내용
@@ -294,6 +295,7 @@ let map = null;           // 카카오 지도 객체
 let geocoder = null;      // 주소→좌표 변환기
 let places = null;        // 카카오 장소(키워드) 검색 서비스
 let searchMarker = null;  // 카카오 장소 검색 결과 임시 마커
+let routeLine = null;     // 지도 위에 그려진 길찾기 경로선
 let coords = {};          // 주소 → {lat,lng}
 let overlays = [];        // 지도에 그려진 원(Circle) 목록
 let state = { energy:'elec', month:'', usages:new Set() };  // 현재 필터 상태 (usages: 선택된 용도 집합)
@@ -715,6 +717,51 @@ function focusBuilding(addr){
   showDetail(b);
 }
 
+// ── 7-2) 지도 위 길찾기 경로 표시 (카카오모빌리티 길찾기 API) ──
+function clearRoute(){
+  if (routeLine){ routeLine.setMap(null); routeLine = null; }
+}
+function drawRouteTo(destLat, destLng, label){
+  const out = document.getElementById('routeMsg');
+  if (!navigator.geolocation){
+    out.textContent = '이 브라우저는 현재 위치를 지원하지 않습니다.';
+    return;
+  }
+  out.textContent = '현재 위치 확인 중…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const from = { lng: pos.coords.longitude, lat: pos.coords.latitude };
+    out.textContent = '경로 조회 중…';
+    fetch(`https://apis-navi.kakaomobility.com/v1/directions?origin=${from.lng},${from.lat}&destination=${destLng},${destLat}`,
+      { headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` } })
+      .then(r=>r.json())
+      .then(data=>{
+        const route = data.routes && data.routes[0];
+        if (!route || route.result_code !== 0){
+          out.textContent = '경로를 찾지 못했습니다. (' + (route?route.result_msg:'응답 없음') + ')';
+          return;
+        }
+        clearRoute();
+        const path = [];
+        route.sections.forEach(sec=>sec.roads.forEach(rd=>{
+          for (let i=0;i<rd.vertexes.length;i+=2){
+            path.push(new kakao.maps.LatLng(rd.vertexes[i+1], rd.vertexes[i]));
+          }
+        }));
+        routeLine = new kakao.maps.Polyline({
+          map, path, strokeWeight:5, strokeColor:'#2563eb', strokeOpacity:.85, strokeStyle:'solid'
+        });
+        const bounds = new kakao.maps.LatLngBounds();
+        path.forEach(p=>bounds.extend(p));
+        map.setBounds(bounds);
+        const km = (route.summary.distance/1000).toFixed(1);
+        const min = Math.round(route.summary.duration/60);
+        out.innerHTML = `🚗 ${label} 까지 약 ${km}km · ${min}분 <span id="routeClear" style="color:#c0392b;cursor:pointer;margin-left:6px">✕ 경로 지우기</span>`;
+        document.getElementById('routeClear').onclick = ()=>{ clearRoute(); out.textContent=''; };
+      })
+      .catch(()=>{ out.textContent = '경로 조회 중 오류가 발생했습니다.'; });
+  }, ()=>{ out.textContent = '현재 위치 권한을 허용해 주세요.'; });
+}
+
 // ── 8) 건물 상세 패널 (월별 전기/가스 차트) ───────────
 function showDetail(b){
   const eMax = Math.max(1,...DATA.months.map(m=>b.elec[m]||0));
@@ -731,12 +778,17 @@ function showDetail(b){
     ${b.road?`<div class="road">${b.road}</div>`:''}
     ${b.usage?`<span class="tag">${b.usage}</span>`:'<span class="tag" style="background:#eee;color:#888">용도정보 없음</span>'}
     ${c?`<a class="tag" style="background:#0b8a5f;color:#fff;cursor:pointer;text-decoration:none" target="_blank"
-        href="https://map.kakao.com/link/to/${encodeURIComponent(b.name||b.addr)},${c.lat},${c.lng}">🚗 길찾기</a>`:''}
+        href="https://map.kakao.com/link/to/${encodeURIComponent(b.name||b.addr)},${c.lat},${c.lng}">🚗 카카오맵 길찾기</a>
+        <span class="tag" id="routeBtn" style="background:#2563eb;color:#fff;cursor:pointer">🗺️ 지도에 경로 표시</span>
+        <div id="routeMsg" style="font-size:11.5px;color:#0b8a5f;margin-top:6px"></div>`:''}
     <div class="meta">
       ${b.gfa?`연면적 ${fmt(b.gfa)}㎡ · 건축면적 ${fmt(b.bdar||0)}㎡ · 대지면적 ${fmt(b.siar||0)}㎡`:''}
     </div>
     <div class="chart"><h4>⚡ 월별 전기 사용량</h4>${rows(b.elec,eMax,'be','kWh')}</div>
     <div class="chart"><h4>🔥 월별 가스 사용량</h4>${rows(b.gas,gMax,'bg','MJ')}</div>`;
+  if (c){
+    document.getElementById('routeBtn').onclick = ()=>drawRouteTo(c.lat, c.lng, b.name||b.addr);
+  }
   document.getElementById('detail').style.display='block';
 }
 document.getElementById('dclose').onclick = ()=>document.getElementById('detail').style.display='none';
