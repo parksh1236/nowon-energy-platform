@@ -197,6 +197,38 @@
   #sunTimeLabel { flex:1; text-align:center; font-size:18px; font-weight:800; color:#f7c948; font-variant-numeric:tabular-nums; }
   #sunPlay { width:100%; margin-top:8px; padding:7px; border:0; border-radius:6px; background:#f7c948; color:#18324d; font-weight:800; font-size:12px; cursor:pointer; }
   #sunDiag { margin-top:8px; font-size:10px; color:#8fa5c0; line-height:1.5; white-space:pre-wrap; }
+
+  /* ── 태양광 랩 (3D 지도 탭) ───────────────────── */
+  #tabSolar { flex:1; overflow-y:auto; padding:12px 18px 18px; }
+  #tabSolar fieldset { border:0; margin:0 0 13px; padding:0; }
+  #tabSolar legend, #tabSolar .t { display:block; margin-bottom:6px; color:#fff; font-size:12px; font-weight:800; }
+  #tabSolar .choice, #tabSolar .solarBtns, #tabSolar .solarGrid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  #tabSolar .choice { display:flex; gap:14px; }
+  #tabSolar .choice label { display:flex; align-items:center; gap:5px; color:#e8eef5; font-size:12px; }
+  #tabSolar input, #tabSolar textarea, #tabSolar select { width:100%; margin-top:3px; padding:7px 8px; border:1px solid rgba(255,255,255,.25); border-radius:6px; background:#16304f; color:#fff; font:12px inherit; }
+  #tabSolar textarea { min-height:62px; resize:vertical; }
+  #tabSolar label { color:#9db3cc; font-size:10.5px; }
+  #tabSolar button { padding:7px 6px; border:0; border-radius:6px; background:#4fd1a5; color:#102840; font-size:11px; font-weight:800; cursor:pointer; }
+  #tabSolar button.secondary { background:#355371; color:#fff; }
+  #tabSolar details { margin:10px 0; border:1px solid rgba(255,255,255,.14); border-radius:7px; padding:8px; }
+  #tabSolar summary { color:#cdd9e8; font-size:11px; font-weight:700; cursor:pointer; }
+  #solarStatus { margin:8px 0; padding:8px; border-left:3px solid #4fd1a5; background:rgba(79,209,165,.1); color:#cfe9df; font-size:11px; line-height:1.45; }
+  #building-info { margin-top:9px; padding:9px; border-radius:7px; background:rgba(255,255,255,.07); }
+  #building-info h3 { margin:0 0 6px; font-size:12px; color:#7fe3c0; }
+  #building-details { display:grid; grid-template-columns:70px 1fr; gap:3px 7px; margin:0; font-size:10.5px; }
+  #building-details dt { color:#8fa5c0; font-weight:700; } #building-details dd { margin:0; color:#fff; overflow-wrap:anywhere; }
+  #solarResultPanel { position:absolute; top:14px; right:14px; bottom:14px; z-index:70; display:none; width:min(390px,calc(100% - 28px)); overflow-y:auto; padding:18px;
+    border-radius:12px; background:rgba(255,255,255,.97); color:#17251d; box-shadow:0 5px 24px rgba(0,0,0,.35); }
+  #solarResultPanel .close { position:sticky; top:0; float:right; width:28px; height:28px; border:0; border-radius:50%; background:#18324d; color:#fff; cursor:pointer; }
+  #solarResultPanel h2 { margin:2px 0 12px; font-size:18px; color:#153d2e; }
+  #solarResults .cards { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  #solarResults .card { padding:10px; border-radius:7px; background:#eef6ed; font-size:11px; }
+  #solarResults .card strong { display:block; margin-top:4px; font-size:15px; }
+  #solarResults .comparison { width:100%; border-collapse:collapse; margin-top:12px; font-size:10px; }
+  #solarResults .comparison th, #solarResults .comparison td { position:relative; padding:6px 3px; border-bottom:1px solid #d5dfd3; text-align:right; }
+  #solarResults .comparison th:first-child { text-align:left; } #solarResults .compare-bar { position:absolute; left:0; right:0; bottom:0; height:2px; background:#e99b22; }
+  #solarResults .warnings { padding-left:18px; color:#773b16; font-size:11px; }
+  #download-csv { width:100%; margin-top:12px; padding:9px; border:0; border-radius:6px; background:#167044; color:#fff; font-weight:800; cursor:pointer; }
 </style>
 <!-- VWorld SDK는 내부 모듈을 document.write로 불러오므로 문서 파싱 중(head)에 로드해야 한다. -->
 <script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=EB2D5106-C922-3CDB-99E6-BC77DBBA1B87"></script>
@@ -251,6 +283,42 @@
       <button id="exportCoords" class="mini" style="float:none">📥 좌표 캐시 내보내기 (coords.json)</button>
     </div>
     </div><!-- /tabEnergy -->
+    <div id="tabSolar" style="display:none">
+      <form id="analysis-form">
+        <fieldset id="building-mode"><legend>건물 유형</legend><div class="choice">
+          <label><input type="radio" name="buildingMode" value="existing" checked> 기존 건물</label>
+          <label><input type="radio" name="buildingMode" value="virtual"> 가상 건물</label>
+        </div></fieldset>
+        <fieldset id="existing-tools"><legend>기존 건물 찾기</legend>
+          <label>도로명 주소<input id="address-query" type="search" placeholder="예: 동일로 1414"></label>
+          <div class="solarBtns"><button id="search-building" type="button">건물 찾기</button><button id="select-building" class="secondary" type="button">지도에서 선택</button></div>
+        </fieldset>
+        <fieldset id="virtual-tools" hidden><legend>가상 건물 지붕</legend><div class="solarBtns">
+          <button id="start-roof-drawing" type="button">지붕 외곽 그리기</button><button id="undo-roof-point" class="secondary" type="button">마지막 점 취소</button>
+          <button id="finish-roof-drawing" type="button">완료</button><button id="reset-roof" class="secondary" type="button">초기화</button>
+        </div></fieldset>
+        <details><summary>좌표 · 제외 영역 직접 입력</summary>
+          <label>지붕 좌표 (한 줄에 lat, lon)<textarea id="roof-coordinates" placeholder="37.654, 127.056"></textarea></label><p id="roof-coordinates-error" hidden></p>
+          <label>건물 높이 (m)<input id="building-height" type="number" min="0" step="0.1" value="0"></label>
+          <label>제외 좌표<textarea id="exclusion-coordinates" placeholder="37.654, 127.056"></textarea></label>
+          <div class="solarBtns"><button id="start-exclusion-drawing" type="button">제외 영역 그리기</button><button id="add-exclusion" class="secondary" type="button">제외 영역 추가</button></div><ul id="exclusion-list"></ul>
+        </details>
+        <fieldset id="analysis-mode"><legend>분석 방식</legend><div class="choice">
+          <label><input type="radio" name="analysisMode" value="rough" checked> 개략 분석</label><label><input type="radio" name="analysisMode" value="detailed"> 정밀 추정</label>
+        </div><label id="precision-options" hidden>정밀도<select id="precision"><option value="fast">빠름</option><option value="balanced" selected>균형</option><option value="fine">정밀</option></select></label></fieldset>
+        <details><summary>태양광 분석 기본값</summary><div class="solarGrid">
+          <label>지붕면적 ㎡<input name="roofAreaM2" type="number" min="0" step="0.1" value="120"></label><label>제외면적 ㎡<input name="exclusionAreaM2" type="number" min="0" step="0.1" value="20"></label>
+          <label>둘레 m<input name="perimeterM" type="number" min="0" step="0.1" value="42"></label><label>이격거리 m<input name="edgeSetbackM" type="number" min="0" step="0.1" value="0.5"></label>
+          <label>배치율 %<input name="layoutRatio" type="number" value="80"></label><label>패널 면적 ㎡<input name="panelAreaM2" type="number" step="0.01" value="2"></label>
+          <label>패널 정격 kW<input name="panelPowerKw" type="number" step="0.01" value="0.45"></label><label>모듈 효율 %<input name="moduleEfficiency" type="number" value="22.5"></label>
+          <label>손실률 %<input name="systemLossRatio" type="number" value="14"></label><label>경사 °<input name="tiltDeg" type="number" value="20"></label>
+          <label>방위 °<input name="azimuthDeg" type="number" value="180"></label>
+        </div></details>
+        <div class="solarBtns"><button id="save-project" class="secondary" type="button">프로젝트 저장</button><button id="run-analysis" type="submit">분석 실행</button></div>
+      </form>
+      <p id="solarStatus" role="status">3D 지도에서 건물을 선택하거나 가상 지붕을 그려 주세요.</p>
+      <section id="building-info" hidden><h3>선택 건물 정보</h3><dl id="building-details"></dl></section>
+    </div>
     <div id="tabCarbon" style="display:none"></div>
   </aside>
 
@@ -269,6 +337,10 @@
       <input id="sunTime" type="range" min="6" max="18" step="0.25" value="12">
       <button id="sunPlay">▶ 시간별 그림자 재생</button>
       <div id="sunDiag"></div>
+    </section>
+    <section id="solarResultPanel" aria-label="태양광 분석 결과">
+      <button id="solarResultClose" class="close" aria-label="닫기">✕</button><h2>태양광 분석 결과</h2>
+      <div id="solarResults" aria-live="polite"></div><button id="download-csv" type="button" disabled>CSV 내보내기</button>
     </section>
     <div id="progress">주소 좌표 변환 중… <span id="pgTxt"></span></div>
     <div id="legend"></div>
@@ -847,6 +919,7 @@ const btnC = document.getElementById('tabBtnCarbon');
 btnE.onclick = ()=>{
   btnE.classList.add('on'); btnC.classList.remove('on'); btnV.classList.remove('on');
   document.getElementById('tabEnergy').style.display='';
+  document.getElementById('tabSolar').style.display='none';
   document.getElementById('tabCarbon').style.display='none';
   document.getElementById('carbonPanel').style.display='none';   // 지도 다시 보이게
   setMainMap('kakao');
@@ -854,6 +927,7 @@ btnE.onclick = ()=>{
 btnC.onclick = ()=>{
   btnC.classList.add('on'); btnE.classList.remove('on'); btnV.classList.remove('on');
   document.getElementById('tabEnergy').style.display='none';
+  document.getElementById('tabSolar').style.display='none';
   document.getElementById('tabCarbon').style.display='block';
   document.getElementById('detail').style.display='none';        // 건물 상세 닫기
   setMainMap('kakao');
@@ -1285,6 +1359,7 @@ function loadVWorld(){
             applySunAnalysis();
             vworldStatus.style.display='none';
             [400, 900, 1600, 2800, 4500].forEach(ms => setTimeout(flyToNowon, ms));
+            window.initSolarLabMap?.();
             return resolve();
           }
           if (++camAttempts >= 100) return reject(new Error('VWorld 3D 뷰어 초기화 시간이 초과되었습니다.'));
@@ -1316,13 +1391,15 @@ function setMainMap(mode){
   vworldEl.style.display = isVWorld ? 'block' : 'none';
   vworldStatus.style.display = isVWorld && !vworldMap ? 'block' : 'none';
   solarPanel.style.display = isVWorld ? 'block' : 'none';
+  if (!isVWorld) document.getElementById('solarResultPanel').style.display='none';
   if (!isVWorld && sunTimer) toggleSunPlayback(false);
   if (isVWorld) loadVWorld();
 }
 
 btnV.onclick = ()=>{
   btnV.classList.add('on'); btnE.classList.remove('on'); btnC.classList.remove('on');
-  document.getElementById('tabEnergy').style.display='';
+  document.getElementById('tabEnergy').style.display='none';
+  document.getElementById('tabSolar').style.display='block';
   document.getElementById('tabCarbon').style.display='none';
   document.getElementById('detail').style.display='none';
   document.getElementById('carbonPanel').style.display='none';
@@ -1341,5 +1418,6 @@ document.getElementById('exportCoords').onclick = ()=>{
   URL.revokeObjectURL(a.href);
 };
 </script>
+<script type="module" src="solar-lab.mjs?v=20260812-integrated-1"></script>
 </body>
 </html>
