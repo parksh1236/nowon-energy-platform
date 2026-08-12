@@ -228,6 +228,12 @@
   #solarResults .comparison th, #solarResults .comparison td { position:relative; padding:6px 3px; border-bottom:1px solid #d5dfd3; text-align:right; }
   #solarResults .comparison th:first-child { text-align:left; } #solarResults .compare-bar { position:absolute; left:0; right:0; bottom:0; height:2px; background:#e99b22; }
   #solarResults .warnings { padding-left:18px; color:#773b16; font-size:11px; }
+  #solarResults .calculation-basis { margin-top:16px; padding-top:12px; border-top:1px solid #d5dfd3; }
+  #solarResults .calculation-basis h3 { margin:0 0 8px; font-size:13px; color:#153d2e; }
+  #solarResults .basis-list { display:grid; grid-template-columns:110px 1fr; gap:5px 10px; margin:0; font-size:10.5px; }
+  #solarResults .basis-list dt { color:#5a6f5c; font-weight:700; }
+  #solarResults .basis-list dd { margin:0; color:#233; line-height:1.5; }
+  #solarResults .basis-note { margin-top:10px; padding:8px 10px; border-radius:6px; background:#fdf3e2; color:#773b16; font-size:10px; line-height:1.5; }
   #download-csv { width:100%; margin-top:12px; padding:9px; border:0; border-radius:6px; background:#167044; color:#fff; font-weight:800; cursor:pointer; }
 </style>
 <!-- VWorld SDK는 내부 모듈을 document.write로 불러오므로 문서 파싱 중(head)에 로드해야 한다. -->
@@ -308,10 +314,10 @@
         </div><label id="precision-options" hidden>정밀도<select id="precision"><option value="fast">빠름</option><option value="balanced" selected>균형</option><option value="fine">정밀</option></select></label></fieldset>
         <details><summary>태양광 분석 기본값</summary><div class="solarGrid">
           <label>지붕면적 ㎡<input name="roofAreaM2" type="number" min="0" step="0.1" value="120"></label><label>제외면적 ㎡<input name="exclusionAreaM2" type="number" min="0" step="0.1" value="20"></label>
-          <label>둘레 m<input name="perimeterM" type="number" min="0" step="0.1" value="42"></label><label>이격거리 m<input name="edgeSetbackM" type="number" min="0" step="0.1" value="0.5"></label>
-          <label>배치율 %<input name="layoutRatio" type="number" value="80"></label><label>패널 면적 ㎡<input name="panelAreaM2" type="number" step="0.01" value="2"></label>
+          <label>둘레 m<input name="perimeterM" type="number" min="0" step="0.1" value="42"></label><label>이격거리 m<input name="edgeSetbackM" type="number" min="0" step="0.1" value="1"></label>
+          <label>배치율 %<input name="layoutRatio" type="number" value="60"></label><label>패널 면적 ㎡<input name="panelAreaM2" type="number" step="0.01" value="2"></label>
           <label>패널 정격 kW<input name="panelPowerKw" type="number" step="0.01" value="0.45"></label><label>모듈 효율 %<input name="moduleEfficiency" type="number" value="22.5"></label>
-          <label>손실률 %<input name="systemLossRatio" type="number" value="14"></label><label>경사 °<input name="tiltDeg" type="number" value="20"></label>
+          <label>손실률 %<input name="systemLossRatio" type="number" value="20"></label><label>경사 °<input name="tiltDeg" type="number" value="20"></label>
           <label>방위 °<input name="azimuthDeg" type="number" value="180"></label>
         </div></details>
         <div class="solarBtns"><button id="save-project" class="secondary" type="button">프로젝트 저장</button><button id="run-analysis" type="submit">분석 실행</button></div>

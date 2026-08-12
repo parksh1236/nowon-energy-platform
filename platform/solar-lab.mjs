@@ -1018,10 +1018,11 @@ export function renderResult(result) {
     ['설치 가능면적', `${format(rough.installableAreaM2)} ㎡`],
     ['설비용량', `${format(rough.capacityKwp)} kWp`],
     ['개략 연간 발전량', `${format(rough.annualKwh)} kWh/년`],
+    ...(rough.dailySolarHours != null ? [['개략 하루 등가 발전시간', `${format(rough.dailySolarHours)} 시간/일`]] : []),
     ...(detailed ? [
       ['정밀 추정 연간 발전량', `${format(detailed.annualKwh)} kWh/년`],
       ['음영 손실률', `${format(detailed.shadingLossRatio * 100)} %`],
-      ...(detailed.dailySolarHours != null ? [['하루 평균 발전 가능시간', `${format(detailed.dailySolarHours)} 시간/일`]] : []),
+      ...(detailed.dailySolarHours != null ? [['음영 반영 하루 등가 발전시간', `${format(detailed.dailySolarHours)} 시간/일`]] : []),
       ['정밀도 / 표본 간격', `${result.precision} / ${result.spacingM} m`],
     ] : []),
   ];
@@ -1057,8 +1058,40 @@ export function renderResult(result) {
     body.append(row);
   }
   table.append(head, body);
-  results.replaceChildren(element('p', detailed ? '개략 분석 / 정밀 추정 결과' : '개략 분석 결과', 'estimate'), cards, ...(warnings ? [warnings] : []), ...(error ? [error] : []), table);
+  results.replaceChildren(element('p', detailed ? '개략 분석 / 정밀 추정 결과' : '개략 분석 결과', 'estimate'), cards, ...(warnings ? [warnings] : []), ...(error ? [error] : []), table, renderCalculationBasis(result));
   if (resultPanel) resultPanel.style.display = 'block';
+}
+
+// 결과 화면 하단 "산출근거" — 각 수치가 어떤 값·공식으로 나왔는지 그대로 노출한다.
+export function calculationBasisRows(result = {}) {
+  const rough = result.rough ?? result;
+  const input = result.project?.input ?? {};
+  const climate = result.climate ?? {};
+  const edgeArea = Math.max(0, (Number(input.perimeterM) || 0) * (Number(input.edgeSetbackM) || 0)
+    - Math.PI * (Number(input.edgeSetbackM) || 0) ** 2);
+  const detailed = result.detailed;
+  return [
+    ['기준 지붕면적', `${format(input.roofAreaM2 || 0)} ㎡`],
+    ['면적 공제', `제외 ${format(input.exclusionAreaM2 || 0)} ㎡ + 가장자리 이격 추정 ${format(edgeArea)} ㎡`],
+    ['유효 옥상면적', `${format(rough.usableAreaM2 || 0)} ㎡ = 지붕면적 - 제외면적 - 이격면적`],
+    ['실제 설치 가능면적', `${format(rough.installableAreaM2 || 0)} ㎡ = 유효면적 × ${format((input.layoutRatio || 0) * 100)}%`],
+    ['패널·설비용량', `${rough.panelCount || 0}장 × ${format(input.panelPowerKw || 0, 2)} kW = ${format(rough.capacityKwp || 0)} kWp`],
+    ['발전량 공식', '설비용량 × 일평균 일사량 × 일수 × 경사·방위 보정 × (1 - 시스템 손실률)'],
+    ['적용 손실·방향', `시스템 손실 ${format((input.systemLossRatio || 0) * 100)}%, 경사 ${format(input.tiltDeg || 0)}°, 방위 ${format(input.azimuthDeg || 0)}°`],
+    ['기상자료', climate.source || '기후자료 미확인'],
+    ['그림자 반영', detailed ? `3D 광선분석 음영 손실 ${format(detailed.shadingLossRatio * 100)}%` : '정밀 추정 실행 시 3D 건물 음영을 반영'],
+    ['하루 등가 발전시간', '연간 발전량(kWh) ÷ 설비용량(kWp) ÷ 365일'],
+  ];
+}
+
+function renderCalculationBasis(result) {
+  const heading = element('h3', '산출근거');
+  const list = element('dl', undefined, 'basis-list');
+  for (const [term, description] of calculationBasisRows(result)) list.append(element('dt', term), element('dd', description));
+  const note = element('p', '본 결과는 사전 타당성 검토용 추정치입니다. 실제 설치 가능 여부와 발전량은 구조안전진단, 현장 장애물, 소방·피난 기준, 계통연계 및 실시설계에서 확정해야 합니다.', 'basis-note');
+  const section = element('section', undefined, 'calculation-basis');
+  section.append(heading, list, note);
+  return section;
 }
 
 function generationCell(kwh, maxKwh) {
