@@ -252,7 +252,8 @@ export function buildAnalysisKml({ roof = [], exclusions = [], installableSample
     <Style id="label"><IconStyle><scale>0</scale></IconStyle><LabelStyle><color>ffffffff</color><scale>1.2</scale></LabelStyle></Style>${placemarks.join('')}</Document></kml>`;
 }
 
-function renderVWorldAnalysisLayer(data) {
+export function renderVWorldAnalysisLayer(data, activeDrawing = drawing) {
+  if (activeDrawing) return false;
   if (!mapInstance?.createKml || typeof vw === 'undefined' || !vw.KMLType?.URL || typeof Blob === 'undefined') return false;
   analysisKmlUrl = URL.createObjectURL(new Blob([buildAnalysisKml(data)], { type: 'application/vnd.google-earth.kml+xml' }));
   mapInstance.createKml(vw.KMLType.URL, ANALYSIS_KML_LAYER, analysisKmlUrl);
@@ -355,6 +356,7 @@ function renderMapShapes() {
   }
   state.exclusions.forEach((points, index) => addMapPolygon(points, '#c0392b77', state.heightM + 1, `제외 ${index + 1} · ${polygonMetrics(points).areaM2.toFixed(1)}㎡`));
   if (drawing?.kind === 'exclusion' && drawing.points.length) addMapPoints(drawing.points, '#c0392b', state.heightM + 1);
+  getViewer()?.scene?.requestRender?.();
 }
 
 function renderExclusions() {
