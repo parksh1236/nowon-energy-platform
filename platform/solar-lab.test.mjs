@@ -41,14 +41,22 @@ test('가상 나무 입력·모델·선택 수정 계약을 제공한다', async
     const app = await import(`./solar-lab.mjs?tree-ui=${Date.now()}`);
     assert.deepEqual(app.validateTreeInput(12, 8), []);
     assert.match(app.validateTreeInput(0, 8)[0], /1m.*50m/);
+    class Cartesian3 {
+      constructor(x, y, z) { Object.assign(this, { x, y, z }); }
+      static fromDegrees(...values) { return values; }
+    }
     const Cesium = {
-      Cartesian3: { fromDegrees: (...values) => values },
+      Cartesian3,
       HeightReference: { NONE: 'none' },
       ShadowMode: { ENABLED: 'enabled' },
     };
     const entity = app.treeEntityDefinition({ center: { lat: 37.654, lon: 127.056 }, heightM: 12, crownDiameterM: 8 }, 20, Cesium);
     assert.equal(entity.model.uri, './assets/tree.glb');
     assert.equal(entity.model.shadows, 'enabled');
+    const scale = entity.model.nodeTransformations.tree_default.scale;
+    assert.ok(Math.abs(scale.x * 0.755000054 - 8) < 1e-6);
+    assert.ok(Math.abs(scale.y * 1.70788741 - 12) < 1e-6);
+    assert.ok(Math.abs(scale.z * 0.653849 - 8) < 1e-6);
     const trees = [{ id: 'tree-1', center: { lat: 37.654, lon: 127.056 }, heightM: 12, crownDiameterM: 8 }];
     assert.equal(app.updateTreeDimensions(trees, 'tree-1', 18, 11), true);
     assert.deepEqual(trees[0].center, { lat: 37.654, lon: 127.056 });
