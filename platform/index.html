@@ -210,6 +210,9 @@
   #tabSolar label { color:#9db3cc; font-size:10.5px; }
   #tabSolar button { padding:7px 6px; border:0; border-radius:6px; background:#4fd1a5; color:#102840; font-size:11px; font-weight:800; cursor:pointer; }
   #tabSolar button.secondary { background:#355371; color:#fff; }
+  #tabSolar .tree-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  #tabSolar .tree-actions button { margin-top:5px; }
+  #tabSolar #tree-list li.selected { padding:5px; border-radius:6px; background:rgba(79,209,165,.14); }
   #tabSolar details { margin:10px 0; border:1px solid rgba(255,255,255,.14); border-radius:7px; padding:8px; }
   #tabSolar summary { color:#cdd9e8; font-size:11px; font-weight:700; cursor:pointer; }
   #solarStatus { margin:8px 0; padding:8px; border-left:3px solid #4fd1a5; background:rgba(79,209,165,.1); color:#cfe9df; font-size:11px; line-height:1.45; }
@@ -309,6 +312,12 @@
           <label>제외 좌표<textarea id="exclusion-coordinates" placeholder="37.654, 127.056"></textarea></label>
           <div class="solarBtns"><button id="start-exclusion-drawing" type="button">제외 영역 그리기</button><button id="add-exclusion" class="secondary" type="button">제외 영역 추가</button></div><ul id="exclusion-list"></ul>
         </details>
+        <fieldset><legend>가상 나무</legend>
+          <div class="solarGrid"><label>높이 (m)<input id="tree-height" type="number" min="1" max="50" step="0.1" value="12"></label><label>수관 지름 (m)<input id="tree-crown" type="number" min="1" max="30" step="0.1" value="8"></label></div>
+          <p id="tree-input-error" role="alert" hidden></p>
+          <button id="place-tree" type="button">지도에 나무 배치</button><button id="update-tree" class="secondary" type="button" hidden>선택 나무 수정</button>
+          <ul id="tree-list" aria-label="배치된 가상 나무"></ul>
+        </fieldset>
         <fieldset id="analysis-mode"><legend>분석 방식</legend><div class="choice">
           <label><input type="radio" name="analysisMode" value="rough" checked> 개략 분석</label><label><input type="radio" name="analysisMode" value="detailed"> 정밀 추정</label>
         </div><label id="precision-options" hidden>정밀도<select id="precision"><option value="fast">빠름</option><option value="balanced" selected>균형</option><option value="fine">정밀</option></select></label></fieldset>
@@ -1424,6 +1433,6 @@ document.getElementById('exportCoords').onclick = ()=>{
   URL.revokeObjectURL(a.href);
 };
 </script>
-<script type="module" src="solar-lab.mjs?v=20260824-live-drawing-1"></script>
+<script type="module" src="solar-lab.mjs?v=20260824-virtual-tree-1"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-import { buildCsv, calculateDetailed, calculateRough, filterInstallableSamples, isInsideNowon, isValidPolygon, polygonMetrics, readStoredProject, removeStoredProject, samplePolygon, serializeProject, sunPosition } from './solar-core.mjs';
+import { buildCsv, calculateDetailedPair, calculateRough, filterInstallableSamples, isInsideNowon, isValidPolygon, localOffset, normalizeTrees, polygonMetrics, rayIntersectsTree, readStoredProject, removeStoredProject, samplePolygon, serializeProject, sunPosition } from './solar-core.mjs';
 
 const PROJECT_KEY = 'nowon-solar-project-v1';
 const NOWON_OFFICE = { lat: 37.654351, lon: 127.056428 };
@@ -30,6 +30,11 @@ const shadowDate = doc?.querySelector('#shadow-date');
 const shadowTime = doc?.querySelector('#shadow-time');
 const shadowTimeLabel = doc?.querySelector('#shadow-time-label');
 const shadowStatus = doc?.querySelector('#shadow-status');
+const treeHeightInput = doc?.querySelector('#tree-height');
+const treeCrownInput = doc?.querySelector('#tree-crown');
+const treeInputError = doc?.querySelector('#tree-input-error');
+const treeList = doc?.querySelector('#tree-list');
+const updateTreeButton = doc?.querySelector('#update-tree');
 let climatePromise;
 let jsonpSequence = 0;
 let analysisGeneration = 0;
@@ -43,8 +48,38 @@ let mapClickHandler;
 let analysisKmlUrl;
 const ANALYSIS_KML_LAYER = 'nowon-solar-analysis-overlay';
 let mapViewSyncStop;
+let selectedTreeId;
 const mapEntities = [];
-const state = { mode: 'existing', roof: [], exclusions: [], heightM: 0, formValues: {}, dirty: false };
+const state = { mode: 'existing', roof: [], exclusions: [], heightM: 0, formValues: {}, dirty: false, trees: [] };
+
+export function validateTreeInput(heightM, crownDiameterM) {
+  const errors = [];
+  if (!Number.isFinite(heightM) || heightM < 1 || heightM > 50) errors.push('나무 높이는 1m 이상 50m 이하로 입력하세요.');
+  if (!Number.isFinite(crownDiameterM) || crownDiameterM < 1 || crownDiameterM > 30) errors.push('수관 지름은 1m 이상 30m 이하로 입력하세요.');
+  return errors;
+}
+
+export function treeEntityDefinition(tree, groundHeightM = 0, Cesium = window.Cesium) {
+  return {
+    position: Cesium.Cartesian3.fromDegrees(tree.center.lon, tree.center.lat, groundHeightM),
+    model: { uri: './assets/tree.glb', minimumPixelSize: 24, maximumScale: tree.heightM, scale: tree.heightM, shadows: Cesium.ShadowMode?.ENABLED, heightReference: Cesium.HeightReference?.NONE },
+  };
+}
+
+export function updateTreeDimensions(trees, id, heightM, crownDiameterM) {
+  const tree = trees.find((candidate) => candidate.id === id);
+  if (!tree) return false;
+  Object.assign(tree, { heightM, crownDiameterM });
+  return true;
+}
+
+export function treeImpact(result = {}) {
+  const baselineAnnualKwh = Number(result.baselineDetailed?.annualKwh);
+  const annualKwh = Number(result.detailed?.annualKwh);
+  if (!Number.isFinite(baselineAnnualKwh) || !Number.isFinite(annualKwh)) return null;
+  const lossKwh = Math.max(0, baselineAnnualKwh - annualKwh);
+  return { baselineAnnualKwh, annualKwh, lossKwh, lossRatio: baselineAnnualKwh > 0 ? lossKwh / baselineAnnualKwh : 0 };
+}
 
 const element = (tag, text, className) => {
   const node = doc.createElement(tag);
@@ -346,17 +381,64 @@ function renderMapShapes() {
   const roofArea = validPolygon(state.roof) ? polygonMetrics(state.roof).areaM2 : 0;
   if (validPolygon(state.roof)) installable = installableVisualization(state.roof, state.exclusions, readForm());
   const draftExclusions = [...state.exclusions, ...(drawing?.kind === 'exclusion' && drawing.points.length >= 3 ? [drawing.points] : [])];
-  if (renderVWorldAnalysisLayer({ roof: state.roof, exclusions: draftExclusions, installableSamples: installable.samples, roofAreaM2: roofArea, installableAreaM2: installable.areaM2, heightM: state.heightM })) return;
-  if (validPolygon(state.roof)) {
-    addMapPolygon(state.roof, '#ffd70080', state.heightM, `지붕 ${roofArea.toFixed(1)}㎡`);
-    addMapPoints(installable.samples, '#58d68d', state.heightM, 6);
-    if (installable.samples.length) addMapLabel(state.roof, `설치 가능 ${installable.areaM2.toFixed(1)}㎡`, '#8a6900', state.heightM + 8);
-  } else if (state.roof.length) {
-    addMapPoints(state.roof, '#ffd700', state.heightM);
+  const renderedKml = renderVWorldAnalysisLayer({ roof: state.roof, exclusions: draftExclusions, installableSamples: installable.samples, roofAreaM2: roofArea, installableAreaM2: installable.areaM2, heightM: state.heightM });
+  if (!renderedKml) {
+    if (validPolygon(state.roof)) {
+      addMapPolygon(state.roof, '#ffd70080', state.heightM, `지붕 ${roofArea.toFixed(1)}㎡`);
+      addMapPoints(installable.samples, '#58d68d', state.heightM, 6);
+      if (installable.samples.length) addMapLabel(state.roof, `설치 가능 ${installable.areaM2.toFixed(1)}㎡`, '#8a6900', state.heightM + 8);
+    } else if (state.roof.length) addMapPoints(state.roof, '#ffd700', state.heightM);
+    state.exclusions.forEach((points, index) => addMapPolygon(points, '#c0392b77', state.heightM + 1, `제외 ${index + 1} · ${polygonMetrics(points).areaM2.toFixed(1)}㎡`));
+    if (drawing?.kind === 'exclusion' && drawing.points.length) addMapPoints(drawing.points, '#c0392b', state.heightM + 1);
   }
-  state.exclusions.forEach((points, index) => addMapPolygon(points, '#c0392b77', state.heightM + 1, `제외 ${index + 1} · ${polygonMetrics(points).areaM2.toFixed(1)}㎡`));
-  if (drawing?.kind === 'exclusion' && drawing.points.length) addMapPoints(drawing.points, '#c0392b', state.heightM + 1);
+  renderTreeEntities();
   getViewer()?.scene?.requestRender?.();
+}
+
+function renderTreeEntities() {
+  const viewer = getViewer();
+  const Cesium = window.Cesium;
+  if (!viewer?.entities?.add || !Cesium?.Cartesian3?.fromDegrees) return;
+  for (const tree of state.trees) {
+    const cartographic = Cesium.Cartographic?.fromDegrees?.(tree.center.lon, tree.center.lat);
+    const groundHeightM = cartographic ? viewer.scene?.globe?.getHeight?.(cartographic) ?? 0 : 0;
+    addMapEntity(viewer, treeEntityDefinition(tree, groundHeightM, Cesium));
+  }
+}
+
+function renderTrees() {
+  if (!treeList) return;
+  treeList.replaceChildren();
+  state.trees.forEach((tree, index) => {
+    const item = element('li');
+    if (tree.id === selectedTreeId) item.classList.add('selected');
+    const actions = element('div', undefined, 'tree-actions');
+    const select = element('button', `나무 ${index + 1} 선택`);
+    select.type = 'button';
+    select.setAttribute('aria-pressed', String(tree.id === selectedTreeId));
+    select.addEventListener('click', () => {
+      selectedTreeId = tree.id;
+      treeHeightInput.value = tree.heightM;
+      treeCrownInput.value = tree.crownDiameterM;
+      updateTreeButton.hidden = false;
+      renderTrees();
+      focusBuildingOnMap(tree.center, `가상 나무 ${index + 1}`, null);
+      setStatus(`가상 나무 ${index + 1}을 선택했습니다. 높이와 수관 지름을 수정할 수 있습니다.`);
+    });
+    const remove = element('button', `나무 ${index + 1} 삭제`, 'secondary');
+    remove.type = 'button';
+    remove.addEventListener('click', () => {
+      if (selectedTreeId === tree.id) { selectedTreeId = undefined; updateTreeButton.hidden = true; }
+      state.trees.splice(index, 1);
+      renderTrees();
+      renderMapShapes();
+      markDirty();
+      setStatus(`가상 나무 ${index + 1}을 삭제했습니다.`);
+    });
+    actions.append(select, remove);
+    item.append(`나무 ${index + 1} · 높이 ${tree.heightM}m · 지름 ${tree.crownDiameterM}m`, actions);
+    treeList.append(item);
+  });
 }
 
 function renderExclusions() {
@@ -489,7 +571,15 @@ export function coordinateFromClick(event, viewer = getViewer(), Cesium = window
 async function handleMapClick(event) {
     const position = coordinateFromClick(event);
     if (!position) return;
-    if (drawing) setDraftPoint(position);
+    if (drawing?.kind === 'tree') {
+      if (!isInsideNowon([position])) return setStatus('가상 나무는 노원구 범위 안에 배치하세요.');
+      state.trees.push({ id: `tree-${Date.now()}-${state.trees.length + 1}`, center: position, heightM: drawing.heightM, crownDiameterM: drawing.crownDiameterM });
+      drawing = undefined;
+      renderTrees();
+      renderMapShapes();
+      markDirty();
+      setStatus('가상 나무를 배치했습니다.');
+    } else if (drawing) setDraftPoint(position);
     else if (state.mode === 'existing' && selectingExistingBuilding) {
       selectingExistingBuilding = false;
       await selectExistingBuilding(position, { label: '지도에서 선택한 건물' });
@@ -801,12 +891,16 @@ export function restoreProject() {
   state.exclusions = project.exclusions;
   state.heightM = project.heightM;
   state.formValues = project.formValues;
+  state.trees = normalizeTrees(project.trees);
+  selectedTreeId = undefined;
+  if (updateTreeButton) updateTreeButton.hidden = true;
   applyFormValues(project.formValues);
   roofCoordinates.value = pointsToText(state.roof);
   heightInput.value = state.heightM;
   updateMetrics();
   updateModeTools();
   renderExclusions();
+  renderTrees();
   renderMapShapes();
   state.dirty = false;
   setStatus('저장된 프로젝트를 복원했습니다.');
@@ -868,16 +962,17 @@ function setAnalysisBusy(busy) {
 }
 
 export function enuDirection(origin, sun, Cesium = window.Cesium) {
-  const altitude = sun.altitudeDeg * Math.PI / 180;
-  const azimuth = sun.azimuthDeg * Math.PI / 180;
-  const local = new Cesium.Cartesian3(
-    Math.cos(altitude) * Math.sin(azimuth),
-    Math.cos(altitude) * Math.cos(azimuth),
-    Math.sin(altitude),
-  );
+  const { east, north, up } = localSunDirection(sun);
+  const local = new Cesium.Cartesian3(east, north, up);
   const frame = Cesium.Transforms.eastNorthUpToFixedFrame(origin);
   const direction = Cesium.Matrix4.multiplyByPointAsVector(frame, local, new Cesium.Cartesian3());
   return Cesium.Cartesian3.normalize(direction, direction);
+}
+
+function localSunDirection(sun) {
+  const altitude = sun.altitudeDeg * Math.PI / 180;
+  const azimuth = sun.azimuthDeg * Math.PI / 180;
+  return { east: Math.cos(altitude) * Math.sin(azimuth), north: Math.cos(altitude) * Math.cos(azimuth), up: Math.sin(altitude) };
 }
 
 export async function pickSceneFromRay(scene, ray, timeoutMs = 5000) {
@@ -917,7 +1012,11 @@ export async function buildShadeSamples(project, quality = 'balanced', isCurrent
   const raySamples = roofSamples.map((sample) => {
     const cartographic = window.Cesium?.Cartographic?.fromDegrees?.(sample.lon, sample.lat);
     const roofHeightM = (cartographic ? scene.globe?.getHeight?.(cartographic) ?? 0 : 0) + (project.heightM ?? 0);
-    return { ...sample, roofHeightM, origin: Cartesian3.fromDegrees(sample.lon, sample.lat, roofHeightM) };
+    return { ...sample, ...localOffset(project.roof[0], sample), roofHeightM, origin: Cartesian3.fromDegrees(sample.lon, sample.lat, roofHeightM) };
+  });
+  const localTrees = normalizeTrees(project.trees).map((tree) => {
+    const cartographic = Cesium.Cartographic?.fromDegrees?.(tree.center.lon, tree.center.lat);
+    return { ...localOffset(project.roof[0], tree.center), baseUp: cartographic ? scene.globe?.getHeight?.(cartographic) ?? 0 : 0, heightM: tree.heightM, crownDiameterM: tree.crownDiameterM };
   });
   const shadeSamples = [];
   if (!isCurrent()) return null;
@@ -931,14 +1030,17 @@ export async function buildShadeSamples(project, quality = 'balanced', isCurrent
         if (sun.altitudeDeg <= 0) continue;
         const altitude = sun.altitudeDeg * Math.PI / 180;
         const origin = sample.origin;
+        const localSun = localSunDirection(sun);
         const direction = enuDirection(origin, sun, Cesium);
         const hit = await pickSceneFromRay(scene, new Ray(origin, direction));
         if (!isCurrent()) return null;
+        const baselineShaded = Boolean(hit?.position && Cartesian3.distance(origin, hit.position) < 100_000);
         shadeSamples.push({
           month,
           hour,
           weight: Math.sin(altitude),
-          shaded: Boolean(hit?.position && Cartesian3.distance(origin, hit.position) < 100_000),
+          shaded: baselineShaded || localTrees.some((tree) => rayIntersectsTree({ east: sample.east, north: sample.north, up: sample.roofHeightM }, localSun, tree)),
+          baselineShaded,
         });
       }
     }
@@ -982,7 +1084,7 @@ export async function runAnalysis(mode) {
     try {
       const shadeSamples = await buildShadeSamples({ ...state, input }, precisionSelect.value, () => generation === analysisGeneration);
       if (shadeSamples === null || generation !== analysisGeneration) return null;
-      latestResult = { ...latestResult, detailed: calculateDetailed(input, climate, shadeSamples) };
+      latestResult = { ...latestResult, ...calculateDetailedPair(input, climate, shadeSamples) };
       renderResult(latestResult);
       setStatus('정밀 추정 분석을 완료했습니다.');
       return latestResult.detailed;
@@ -1015,6 +1117,8 @@ const format = (value, fractionDigits = 1) => Number(value).toLocaleString('ko-K
 export function renderResult(result) {
   const rough = result.rough ?? result;
   const detailed = result.detailed;
+  const impact = treeImpact(result);
+  const treeCount = normalizeTrees(result.project?.trees).length;
   const cards = element('div', undefined, 'cards');
   const values = [
     ['설치 가능면적', `${format(rough.installableAreaM2)} ㎡`],
@@ -1022,10 +1126,15 @@ export function renderResult(result) {
     ['개략 연간 발전량', `${format(rough.annualKwh)} kWh/년`],
     ...(rough.dailySolarHours != null ? [['개략 하루 등가 발전시간', `${format(rough.dailySolarHours)} 시간/일`]] : []),
     ...(detailed ? [
-      ['정밀 추정 연간 발전량', `${format(detailed.annualKwh)} kWh/년`],
+      [treeCount ? '나무 반영 정밀 발전량' : '정밀 추정 연간 발전량', `${format(detailed.annualKwh)} kWh/년`],
       ['음영 손실률', `${format(detailed.shadingLossRatio * 100)} %`],
       ...(detailed.dailySolarHours != null ? [['음영 반영 하루 등가 발전시간', `${format(detailed.dailySolarHours)} 시간/일`]] : []),
       ['정밀도 / 표본 간격', `${result.precision} / ${result.spacingM} m`],
+      ...(impact && treeCount ? [
+        ['나무 미반영 발전량', `${format(impact.baselineAnnualKwh)} kWh/년`],
+        ['나무로 인한 감소량', `${format(impact.lossKwh)} kWh/년`],
+        ['나무 영향 감소율', `${format(impact.lossRatio * 100)} %`],
+      ] : []),
     ] : []),
   ];
   for (const [label, value] of values) {
@@ -1072,6 +1181,8 @@ export function calculationBasisRows(result = {}) {
   const edgeArea = Math.max(0, (Number(input.perimeterM) || 0) * (Number(input.edgeSetbackM) || 0)
     - Math.PI * (Number(input.edgeSetbackM) || 0) ** 2);
   const detailed = result.detailed;
+  const impact = treeImpact(result);
+  const treeCount = normalizeTrees(result.project?.trees).length;
   return [
     ['기준 지붕면적', `${format(input.roofAreaM2 || 0)} ㎡`],
     ['면적 공제', `제외 ${format(input.exclusionAreaM2 || 0)} ㎡ + 가장자리 이격 추정 ${format(edgeArea)} ㎡`],
@@ -1082,6 +1193,8 @@ export function calculationBasisRows(result = {}) {
     ['적용 손실·방향', `시스템 손실 ${format((input.systemLossRatio || 0) * 100)}%, 경사 ${format(input.tiltDeg || 0)}°, 방위 ${format(input.azimuthDeg || 0)}°`],
     ['기상자료', climate.source || '기후자료 미확인'],
     ['그림자 반영', detailed ? `3D 광선분석 음영 손실 ${format(detailed.shadingLossRatio * 100)}%` : '정밀 추정 실행 시 3D 건물 음영을 반영'],
+    ['가상 나무 음영', treeCount ? `${treeCount}개 · 불투명 원기둥으로 단순화` : '가상 나무 없음'],
+    ...(impact ? [['나무 영향', `${format(impact.lossKwh)} kWh/년 감소 (${format(impact.lossRatio * 100)}%)`]] : []),
     ['하루 등가 발전시간', '연간 발전량(kWh) ÷ 설비용량(kWp) ÷ 365일'],
   ];
 }
@@ -1171,6 +1284,34 @@ document.querySelector('#finish-roof-drawing').addEventListener('click', finishR
 document.querySelector('#reset-roof').addEventListener('click', clearRoof);
 document.querySelector('#start-exclusion-drawing').addEventListener('click', () => { drawing = { kind: 'exclusion', points: [] }; setStatus('지도에서 제외 영역 꼭짓점을 차례로 선택하세요.'); });
 document.querySelector('#add-exclusion').addEventListener('click', () => { const points = parsePoints(exclusionCoordinates.value); if (points === null) setStatus('좌표는 한 줄에 lat, lon 형식으로 입력하세요.'); else addExclusionPolygon(points); });
+document.querySelector('#place-tree').addEventListener('click', () => {
+  const heightM = Number(treeHeightInput.value);
+  const crownDiameterM = Number(treeCrownInput.value);
+  const errors = validateTreeInput(heightM, crownDiameterM);
+  if (state.trees.length >= 50) errors.push('가상 나무는 최대 50개까지 배치할 수 있습니다.');
+  treeInputError.hidden = errors.length === 0;
+  treeInputError.textContent = errors.join(' ');
+  if (errors.length) return setStatus(errors[0]);
+  drawing = { kind: 'tree', heightM, crownDiameterM };
+  setStatus('지도에서 가상 나무의 중심 위치를 클릭하세요.');
+});
+updateTreeButton.addEventListener('click', () => {
+  const heightM = Number(treeHeightInput.value);
+  const crownDiameterM = Number(treeCrownInput.value);
+  const errors = validateTreeInput(heightM, crownDiameterM);
+  treeInputError.hidden = errors.length === 0;
+  treeInputError.textContent = errors.join(' ');
+  if (errors.length) return setStatus(errors[0]);
+  if (!updateTreeDimensions(state.trees, selectedTreeId, heightM, crownDiameterM)) {
+    selectedTreeId = undefined;
+    updateTreeButton.hidden = true;
+    return setStatus('수정할 가상 나무를 다시 선택하세요.');
+  }
+  renderTrees();
+  renderMapShapes();
+  markDirty();
+  setStatus('선택한 가상 나무의 높이와 수관 지름을 수정했습니다.');
+});
 document.querySelector('#search-building').addEventListener('click', searchBuilding);
 document.querySelector('#select-building').addEventListener('click', () => {
   selectingExistingBuilding = true;
