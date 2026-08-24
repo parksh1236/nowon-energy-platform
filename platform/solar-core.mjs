@@ -1,13 +1,14 @@
 const EARTH_RADIUS_M = 6_371_000;
 const radians = (degrees) => (degrees * Math.PI) / 180;
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
-const projectFields = ['mode', 'roof', 'exclusions', 'heightM', 'formValues', 'dirty'];
+const projectFields = ['mode', 'roof', 'exclusions', 'heightM', 'formValues', 'dirty', 'trees'];
 
 export function serializeProject(state = {}) {
   const project = {};
   for (const field of projectFields) {
     if (Object.hasOwn(state, field)) project[field] = state[field];
   }
+  project.trees = normalizeTrees(state.trees);
   return JSON.stringify(project);
 }
 
@@ -19,6 +20,7 @@ export function deserializeProject(value) {
     for (const field of projectFields) {
       if (Object.hasOwn(parsed, field)) project[field] = parsed[field];
     }
+    project.trees = normalizeTrees(parsed.trees);
     return Object.keys(project).length ? project : null;
   } catch {
     return null;
@@ -29,6 +31,46 @@ export function isInsideNowon(points) {
   return Array.isArray(points) && points.length > 0 && points.every((point) => (
     Number.isFinite(point?.lat) && Number.isFinite(point?.lon) && point.lat >= 37.58 && point.lat <= 37.70 && point.lon >= 127.00 && point.lon <= 127.12
   ));
+}
+
+export function normalizeTrees(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 50).filter((tree) => (
+    typeof tree?.id === 'string' && tree.id.length > 0
+    && isInsideNowon([tree.center])
+    && Number.isFinite(tree.heightM) && tree.heightM >= 1 && tree.heightM <= 50
+    && Number.isFinite(tree.crownDiameterM) && tree.crownDiameterM >= 1 && tree.crownDiameterM <= 30
+  )).map((tree) => structuredClone(tree));
+}
+
+export function rayIntersectsTree(sample, direction, tree) {
+  const x = sample.east - tree.east;
+  const y = sample.north - tree.north;
+  const radius = tree.crownDiameterM / 2;
+  const a = direction.east ** 2 + direction.north ** 2;
+  const b = 2 * (x * direction.east + y * direction.north);
+  const c = x ** 2 + y ** 2 - radius ** 2;
+  if (c <= 0 && sample.up >= tree.baseUp && sample.up <= tree.baseUp + tree.heightM) return true;
+  const candidates = [];
+  if (a > 1e-12) {
+    const discriminant = b ** 2 - 4 * a * c;
+    if (discriminant >= 0) candidates.push((-b - Math.sqrt(discriminant)) / (2 * a), (-b + Math.sqrt(discriminant)) / (2 * a));
+  } else if (c <= 0 && direction.up > 0) {
+    candidates.push((tree.baseUp + tree.heightM - sample.up) / direction.up);
+  }
+  return candidates.some((distance) => {
+    if (distance <= 1e-6) return false;
+    const up = sample.up + distance * direction.up;
+    return up >= tree.baseUp && up <= tree.baseUp + tree.heightM;
+  });
+}
+
+export function localOffset(origin, point) {
+  const meanLatitude = radians((origin.lat + point.lat) / 2);
+  return {
+    east: radians(point.lon - origin.lon) * EARTH_RADIUS_M * Math.cos(meanLatitude),
+    north: radians(point.lat - origin.lat) * EARTH_RADIUS_M,
+  };
 }
 
 const cross = (a, b, c) => (b.lon - a.lon) * (c.lat - a.lat) - (b.lat - a.lat) * (c.lon - a.lon);
@@ -66,7 +108,8 @@ export function isValidProject(project) {
     && Array.isArray(project.roof) && (!project.roof.length || isValidPolygon(project.roof))
     && Array.isArray(project.exclusions) && project.exclusions.every(isValidPolygon)
     && Number.isFinite(project.heightM) && project.heightM >= 0
-    && project.formValues && typeof project.formValues === 'object';
+    && project.formValues && typeof project.formValues === 'object'
+    && Array.isArray(project.trees) && project.trees.length === normalizeTrees(project.trees).length;
 }
 
 export function readStoredProject(storage, key) {
@@ -213,6 +256,13 @@ export function calculateDetailed(input, climate, shadeSamples) {
     dailySolarHours: solarHours.averageHours,
     monthlySolarHours: solarHours.months,
     dailyUnshadedWindowHours: summarizeDailySolarHours(shadeSamples).averageHours,
+  };
+}
+
+export function calculateDetailedPair(input, climate, shadeSamples) {
+  return {
+    detailed: calculateDetailed(input, climate, shadeSamples),
+    baselineDetailed: calculateDetailed(input, climate, shadeSamples.map((sample) => ({ ...sample, shaded: sample.baselineShaded }))),
   };
 }
 
@@ -387,6 +437,11 @@ export function buildCsv(result = {}, project = {}, climate = {}) {
   const solarHoursByMonth = new Map((detailed?.monthlySolarHours ?? []).map(({ month, hours }) => [month, hours]));
   const formLoss = Number(project.formValues?.systemLossRatio);
   const systemLossRatio = project.systemLossRatio ?? project.input?.systemLossRatio ?? (Number.isFinite(formLoss) ? formLoss / 100 : '');
+  const trees = normalizeTrees(project.trees);
+  const baselineAnnualKwh = result.baselineDetailed?.annualKwh ?? '';
+  const detailedAnnualKwh = detailed?.annualKwh ?? '';
+  const treeLossKwh = Number.isFinite(baselineAnnualKwh) && Number.isFinite(detailedAnnualKwh)
+    ? Math.max(0, baselineAnnualKwh - detailedAnnualKwh) : '';
   const rows = [['월', '개략발전량_kWh', '정밀추정발전량_kWh', '음영반영_일평균발전가능시간_h']];
   for (let month = 1; month <= 12; month += 1) rows.push([month, roughByMonth.get(month), detailedByMonth.get(month), solarHoursByMonth.get(month)]);
   rows.push(
@@ -398,6 +453,11 @@ export function buildCsv(result = {}, project = {}, climate = {}) {
     ['정밀도', result.precision ?? project.precision ?? ''],
     ['표본간격m', result.spacingM ?? project.spacingM ?? ''],
     ['연평균_일발전가능시간h', detailed?.dailySolarHours ?? ''],
+    ['가상 나무 수', trees.length],
+    ['나무 미반영 연간 발전량(kWh)', baselineAnnualKwh],
+    ['나무 반영 연간 발전량(kWh)', detailedAnnualKwh],
+    ['나무로 인한 감소량(kWh)', treeLossKwh],
+    ...trees.map((tree, index) => [`가상 나무 ${index + 1}`, `${tree.center.lat},${tree.center.lon}`, `높이 ${tree.heightM}m`, `수관 지름 ${tree.crownDiameterM}m`]),
     ['기후자료출처', climate.source ?? ''],
     ['분석구분', '사전 추정치'],
   );
