@@ -1481,7 +1481,7 @@ function showMRVSection(key){
 
 // ── 세부사업별 MRV 계획 · 연차별 실적 입력 위젯 ────────
 const MRV_YEARS = [2026,2027,2028,2029,2030];
-const MRV_ACTUALS_KEY = 'nowon_mrv_actuals_v1';
+const MRV_ACTUALS_KEY = 'nowon_mrv_actuals_v2';  // v2: 사업별 {total:{연도:값}, items:{지표명:{연도:값}}} 구조로 개편
 function loadMRVActuals(){
   try { return JSON.parse(localStorage.getItem(MRV_ACTUALS_KEY) || '{}'); }
   catch(e){ return {}; }
@@ -1505,24 +1505,29 @@ function initMRVProjectList(){
   renderMRVProjList('전체');
 }
 
+// 프로젝트의 연차별(누적) 목표를 반환: yearly 배열이 있으면 그대로, 없으면 reduction을 5개년 균등 누적 추정
+function mrvYearlyTargets(p){
+  if (p.yearly) return p.yearly;
+  if (p.reduction) return MRV_YEARS.map((y,i)=>Math.round(p.reduction*(i+1)/5*10)/10);
+  return null;
+}
+
 function renderMRVProjList(sec){
   const list = sec==='전체' ? CARBON.projects : CARBON.projects.filter(p=>p.sector===sec);
   const actuals = loadMRVActuals();
   document.getElementById('mrvProjList').innerHTML = list.map(p=>{
     const m = p.mrv || {};
     const isQuant = m.mrvType && m.mrvType.indexOf('정성')===-1;
-    // 연차별 목표: yearly가 있으면 그대로, 없으면 reduction을 5개년 균등 누적 추정
-    let targets = null;
-    if (isQuant){
-      if (p.yearly) targets = p.yearly;
-      else if (p.reduction) targets = MRV_YEARS.map((y,i)=>Math.round(p.reduction*(i+1)/5*10)/10);
-    }
+    const targets = isQuant ? mrvYearlyTargets(p) : null;
     const key = mrvProjKey(p);
-    const a = actuals[key] || {};
+    const a = (actuals[key] || {}).total || {};
+    const itemActuals = (actuals[key] || {}).items || {};
+    const items = m.items || [];  // 이 단위사업을 구성하는 세부 모니터링 지표 (있으면 사업별 맞춤 입력)
+
     return `
       <details class="mrvpj">
         <summary><span class="mpid">${p.id}</span> ${p.name}
-          <span class="mpmeta">${p.sector} 부문${p.reduction?` · 목표 ${fmt(p.reduction)} tCO₂eq`:''} · MRV ${m.mrvType||'-'}</span></summary>
+          <span class="mpmeta">${p.sector} 부문${p.reduction?` · 목표 ${fmt(p.reduction)} tCO₂eq`:''} · MRV ${m.mrvType||'-'}${items.length?` · 세부지표 ${items.length}개`:''}</span></summary>
         <div class="mpbody">
           <div class="dsec" style="margin-top:6px">MRV 데이터 계획</div>
           <table class="dt">
@@ -1534,7 +1539,17 @@ function renderMRVProjList(sec){
           </table>
           ${m.integration?`<div class="mpint"><b>🔗 데이터 자동 연계 방법</b><br>${m.integration}</div>`:''}
 
-          <div class="dsec">연차별 목표·실적 (tCO₂eq${!isQuant?' · 정성사업은 실적 메모':''})</div>
+          ${items.length?`
+          <div class="dsec">세부 지표별 연차별 실적 (이 사업은 ${items.length}개 세부 모니터링 지표로 구성)</div>
+          <div class="dnote" style="margin-bottom:6px">세부사업(설비·프로그램)별로 실제 활동량 단위 그대로 입력합니다. 감축량(tCO₂eq) 환산은 위 산출식을 참고해 별도 계산해 주세요.</div>
+          ${items.map((it,ii)=>`
+            <table class="dt mpitemtbl" data-key="${key}" data-item="${ii}" style="margin-bottom:8px">
+              <tr><th style="width:170px">${it.label}${it.unit?` (${it.unit})`:''}</th>${MRV_YEARS.map(y=>`<th>${y}</th>`).join('')}</tr>
+              <tr><td>목표(2030 누적)</td>${MRV_YEARS.map((y,i)=>`<td>${it.target!=null?(i===MRV_YEARS.length-1?fmt(it.target):'-'):'-'}</td>`).join('')}</tr>
+              <tr><td>실적</td>${MRV_YEARS.map(y=>`<td><input type="number" class="mpiteminput" data-y="${y}" value="${itemActuals[it.label]&&itemActuals[it.label][y]!=null?itemActuals[it.label][y]:''}" placeholder="0" style="width:60px;padding:4px;font-size:11px"></td>`).join('')}</tr>
+            </table>`).join('')}
+          <div class="dsec">합계 감축량 실적 (tCO₂eq)</div>`
+          :`<div class="dsec">연차별 목표·실적 (tCO₂eq${!isQuant?' · 정성사업은 실적 메모':''})</div>`}
           <table class="dt mpyeartbl" data-key="${key}">
             <tr><th style="width:70px">연도</th>${MRV_YEARS.map(y=>`<th>${y}</th>`).join('')}</tr>
             <tr><td>목표</td>${MRV_YEARS.map((y,i)=>`<td>${targets?fmt(targets[i]):'-'}</td>`).join('')}</tr>
@@ -1554,7 +1569,7 @@ function renderMRVProjList(sec){
       </details>`;
   }).join('');
 
-  // 입력 저장 + 달성률 즉시 갱신
+  // 합계(tCO₂eq) 실적 입력 저장 + 달성률 즉시 갱신
   document.querySelectorAll('#mrvProjList .mpinput').forEach(inp=>{
     inp.onchange = ()=>{
       const table = inp.closest('table.mpyeartbl');
@@ -1562,23 +1577,41 @@ function renderMRVProjList(sec){
       const y = inp.dataset.y;
       const all = loadMRVActuals();
       all[key] = all[key] || {};
-      if (inp.value === '') delete all[key][y]; else all[key][y] = inp.type==='number' ? parseFloat(inp.value) : inp.value;
+      all[key].total = all[key].total || {};
+      if (inp.value === '') delete all[key].total[y]; else all[key].total[y] = inp.type==='number' ? parseFloat(inp.value) : inp.value;
       saveMRVActuals(all);
-      // 같은 표 안의 달성률 셀만 다시 계산(전체 리렌더 없이)
       const p = CARBON.projects.find(pp=>mrvProjKey(pp)===key);
       const isQuant = p.mrv && p.mrv.mrvType && p.mrv.mrvType.indexOf('정성')===-1;
       if (isQuant){
-        let targets = p.yearly || (p.reduction ? MRV_YEARS.map((yy,i)=>Math.round(p.reduction*(i+1)/5*10)/10) : null);
+        const targets = mrvYearlyTargets(p);
         const idx = MRV_YEARS.indexOf(+y);
         const cell = table.querySelector(`.mprate[data-y="${y}"]`);
         if (cell && targets){
           const t = targets[idx];
-          const v = all[key][y];
+          const v = all[key].total[y];
           const pct = (t>0 && v!=null && v!=='') ? Math.round(v/t*100) : null;
           cell.textContent = pct!=null ? pct+'%' : '-';
         }
       }
     };
+  });
+
+  // 세부 지표별 실적 입력 저장
+  document.querySelectorAll('#mrvProjList .mpitemtbl').forEach(table=>{
+    const key = table.dataset.key;
+    const p = CARBON.projects.find(pp=>mrvProjKey(pp)===key);
+    const label = p.mrv.items[+table.dataset.item].label;
+    table.querySelectorAll('.mpiteminput').forEach(inp=>{
+      inp.onchange = ()=>{
+        const y = inp.dataset.y;
+        const all = loadMRVActuals();
+        all[key] = all[key] || {};
+        all[key].items = all[key].items || {};
+        all[key].items[label] = all[key].items[label] || {};
+        if (inp.value === '') delete all[key].items[label][y]; else all[key].items[label][y] = parseFloat(inp.value);
+        saveMRVActuals(all);
+      };
+    });
   });
 }
 
