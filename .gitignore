@@ -1,3 +1,4 @@
 .DS_Store
 platform/.claude-launch-note.txt
 *.pdf
+platform/apikeys.local.js

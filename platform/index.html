@@ -177,6 +177,7 @@
   details.mrvpj[open] summary { border-bottom:1px solid #e4eaf0; }
   details.mrvpj .mpbody { padding:4px 14px 14px; }
   .mpint { margin-top:10px; padding:9px 12px; background:#eef6ff; border-left:3px solid #2563eb; border-radius:0 8px 8px 0; font-size:12px; color:#1e3a5f; line-height:1.6; }
+  .mpintl { margin-top:8px; padding:9px 12px; background:#fdf3e7; border-left:3px solid #b5551f; border-radius:0 8px 8px 0; font-size:12px; color:#5c3512; line-height:1.6; }
   .mpyeartbl th, .mpyeartbl td { text-align:center; }
   .mprate { font-weight:700; color:#0b8a5f; }
   .cyr { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; color:#334; }
@@ -394,6 +395,8 @@
   </div>
 </div>
 
+<!-- apikeys.local.js는 .gitignore 대상 — API 키는 절대 이 파일이나 채팅에 직접 넣지 말 것 -->
+<script src="apikeys.local.js"></script>
 <script>
 // ══════════════════════════════════════════════════════
 // 노원구 에너지정보플랫폼 메인 스크립트
@@ -1429,6 +1432,8 @@ function showMRVSection(key){
         <li><b>GPC 준수 인벤토리 문서화</b> — Scope 1/2/3 구분은 있으나 GPC 서식에 맞춘 공식 인벤토리 보고서 산출물은 아직 없음</li>
         <li><b>C40/GCoM 공통보고 프레임워크(CRF) 정합</b> — 국제협력 네트워크 가입 시 요구되는 표준 보고서식과의 매핑 작업 필요</li>
       </ul>
+      <div class="dsec">사업별 상세</div>
+      <div class="dnote">✅ 채택 4개 기준(IPCC·GHG Protocol/GPC·Programmatic CDM/VCS·K-VER/K-ETS)이 각 세부사업에서 실제로 인정받으려면 어떤 데이터·절차가 더 필요한지는 사업별로 다릅니다 — <b>"📥 세부사업별 MRV 계획·실적 입력"</b> 메뉴에서 각 사업을 펼치면 하단에 <span style="color:#b5551f;font-weight:700">🌍 국제 기준 적용 시 필요 데이터·방법론</span> 항목으로 표시됩니다.</div>
       <div class="dnote">출처: 「노원구 탄소중립 선도도시 기본계획」(2026.07) 3장 MRV·행정효율화 항목, 「MRV 플랫폼 구성안 계획 수립(Pre-ISP)」(2026.03) 1.2.3/1.4.2</div>`;
   }
 
@@ -1538,6 +1543,7 @@ function renderMRVProjList(sec){
             ${m.consideration?`<tr><th>주요 고려사항</th><td>${m.consideration}</td></tr>`:''}
           </table>
           ${m.integration?`<div class="mpint"><b>🔗 데이터 자동 연계 방법</b><br>${m.integration}</div>`:''}
+          ${m.intlRequirement?`<div class="mpintl"><b>🌍 국제 기준 적용 시 필요 데이터·방법론</b><br>${m.intlRequirement}</div>`:''}
 
           ${items.length?`
           <div class="dsec">세부 지표별 연차별 실적 (이 사업은 ${items.length}개 세부 모니터링 지표로 구성)</div>
