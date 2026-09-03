@@ -77,13 +77,13 @@
   .mini:hover { color:#4fd1a5; border-color:#4fd1a5; }
 
   /* ── 상단 탭 ────────────────────────────────── */
-  .tabs { display:flex; gap:6px; margin-top:10px; }
-  .tabs button { flex:1; padding:8px 0; font-size:13.5px; font-weight:700; border:1px solid rgba(255,255,255,.25);
-    background:transparent; color:#cdd9e8; border-radius:8px; cursor:pointer; }
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .tabs button { flex:1 1 calc(50% - 6px); min-width:0; padding:8px 2px; font-size:12px; font-weight:700; border:1px solid rgba(255,255,255,.25);
+    background:transparent; color:#cdd9e8; border-radius:8px; cursor:pointer; white-space:nowrap; }
   .tabs button.on { background:#4fd1a5; border-color:#4fd1a5; color:#0f2540; }
 
   /* ── 탄소중립계획 탭 ────────────────────────── */
-  #tabCarbon { flex:1; overflow-y:auto; padding:12px 18px; }
+  #tabCarbon, #tabMRV { flex:1; overflow-y:auto; padding:12px 18px; }
   #tabCarbon .card h3 { color:#7fe3c0; }
   #tabCarbon .sec { font-size:13.5px; font-weight:800; color:#fff; margin:14px 0 8px; padding-bottom:5px; border-bottom:2px solid #4fd1a5; }
   #tabCarbon ul { margin:4px 0 4px 16px; }
@@ -252,6 +252,7 @@
         <button id="tabBtnEnergy" class="on">⚡ 에너지정보</button>
         <button id="tabBtnVWorld">☀️ Solar Lab</button>
         <button id="tabBtnCarbon">🌱 탄소중립계획</button>
+        <button id="tabBtnMRV">🧮 MRV 시스템</button>
       </div>
     </div>
     <div id="tabEnergy">
@@ -335,6 +336,7 @@
       <section id="building-info" hidden><h3>선택 건물 정보</h3><dl id="building-details"></dl></section>
     </div>
     <div id="tabCarbon" style="display:none"></div>
+    <div id="tabMRV" style="display:none"></div>
   </aside>
 
   <!-- 지도 -->
@@ -927,30 +929,50 @@ document.getElementById('dclose').onclick = ()=>document.getElementById('detail'
 // 탄소중립계획 탭
 // ══════════════════════════════════════════════════════
 let CARBON = null;   // carbon.json 내용
+let carbonMenuBuilt = false, mrvMenuBuilt = false;   // 사이드바 메뉴는 최초 1회만 빌드(탭 복귀 시 마지막 화면 유지)
+function loadCarbonJSON(cb){
+  if (CARBON) return cb();
+  fetch('carbon.json').then(r=>r.json()).then(d=>{ CARBON=d; cb(); });
+}
 
 // 탭 전환 처리
 const btnE = document.getElementById('tabBtnEnergy');
 const btnC = document.getElementById('tabBtnCarbon');
+const btnM = document.getElementById('tabBtnMRV');
 btnE.onclick = ()=>{
-  btnE.classList.add('on'); btnC.classList.remove('on'); btnV.classList.remove('on');
+  btnE.classList.add('on'); btnC.classList.remove('on'); btnV.classList.remove('on'); btnM.classList.remove('on');
   document.getElementById('tabEnergy').style.display='';
   document.getElementById('tabSolar').style.display='none';
   document.getElementById('tabCarbon').style.display='none';
+  document.getElementById('tabMRV').style.display='none';
   document.getElementById('carbonPanel').style.display='none';   // 지도 다시 보이게
   setMainMap('kakao');
 };
 btnC.onclick = ()=>{
-  btnC.classList.add('on'); btnE.classList.remove('on'); btnV.classList.remove('on');
+  btnC.classList.add('on'); btnE.classList.remove('on'); btnV.classList.remove('on'); btnM.classList.remove('on');
   document.getElementById('tabEnergy').style.display='none';
   document.getElementById('tabSolar').style.display='none';
   document.getElementById('tabCarbon').style.display='block';
+  document.getElementById('tabMRV').style.display='none';
   document.getElementById('detail').style.display='none';        // 건물 상세 닫기
   setMainMap('kakao');
-  if (!CARBON){
-    fetch('carbon.json').then(r=>r.json()).then(d=>{ CARBON=d; renderCarbon(); });
-  } else {
-    document.getElementById('carbonPanel').style.display='block';  // 탭 복귀 시 대시보드 다시 표시
-  }
+  loadCarbonJSON(()=>{
+    if (!carbonMenuBuilt){ renderCarbon(); carbonMenuBuilt = true; }
+    else document.getElementById('carbonPanel').style.display='block';  // 탭 복귀 시 대시보드 다시 표시
+  });
+};
+btnM.onclick = ()=>{
+  btnM.classList.add('on'); btnE.classList.remove('on'); btnC.classList.remove('on'); btnV.classList.remove('on');
+  document.getElementById('tabEnergy').style.display='none';
+  document.getElementById('tabSolar').style.display='none';
+  document.getElementById('tabCarbon').style.display='none';
+  document.getElementById('tabMRV').style.display='block';
+  document.getElementById('detail').style.display='none';
+  setMainMap('kakao');
+  loadCarbonJSON(()=>{
+    if (!mrvMenuBuilt){ renderMRVTab(); mrvMenuBuilt = true; }
+    else document.getElementById('carbonPanel').style.display='block';
+  });
 };
 
 // ── 탄소중립계획 사이드바: 제목 메뉴만 표시 ───────────
@@ -966,8 +988,7 @@ function renderCarbon(){
       if (!list.length) return '';
       return `<div class="cm" data-sector="${sec}">■ ${sec} 부문 <span style="font-weight:400;color:#9db3cc">(${list.length})</span></div>`;
     }).join('')}
-    <div class="sec" style="margin-top:16px">🧮 온실가스 계산기</div>
-    <div class="cm" data-sec="mrv">🧮 온실가스 계산기</div>`;
+    `;
 
   // 상단 메뉴 클릭 → 오른쪽 대시보드
   document.querySelectorAll('#tabCarbon .cm[data-sec]').forEach(el=>{
@@ -982,7 +1003,7 @@ function renderCarbon(){
   setActiveMenu(first); showCarbonSection('overview');
 }
 function setActiveMenu(el){
-  document.querySelectorAll('#tabCarbon .cm, #tabCarbon .pj').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('#tabCarbon .cm, #tabCarbon .pj, #tabMRV .cm').forEach(x=>x.classList.remove('on'));
   el.classList.add('on');
 }
 
@@ -1066,33 +1087,6 @@ function showCarbonSection(key){
         <span class="cv">${fmt(x.reduction)} tCO₂eq</span></div>`).join('')}`;
   }
 
-  if (key === 'mrv'){
-    const m = CARBON.mrv;
-    html = `
-      <h2>🧮 온실가스 계산기</h2>
-      <div class="dsec">감축량 계산기</div>
-      <div class="dnote">${m.catalogNote}<br>부문 → 감축사업 → 산정기준을 선택하고 활동량을 입력한 뒤 [추가]를 누르세요. 여러 사업을 추가하면 합계가 자동 계산됩니다.</div>
-      <div class="calcbox">
-        <select id="calcSec" style="flex:0 0 130px"></select>
-        <select id="calcMeasure"></select>
-      </div>
-      <div class="calcbox">
-        <select id="calcEntry" style="flex:0 0 260px"></select>
-        <input id="calcVal" type="number" min="0" placeholder="활동량 입력">
-        <span id="calcUnit" class="calcunit"></span>
-        <button id="calcBtn">➕ 추가</button>
-      </div>
-      <div id="calcList"></div>
-      <div id="calcOut" class="calcout"></div>
-
-      <div class="dsec">노원구 계획 주요 감축원단위</div>
-      <table class="dt">
-        <tr><th style="width:auto">감축수단</th><th style="width:auto">원단위 (tCO₂eq)</th><th style="width:auto">근거</th></tr>
-        ${m.factors.map(f=>`<tr><td>${f.name}</td><td>${f.factor} / ${f.unit}</td><td>${f.note}</td></tr>`).join('')}
-      </table>
-      <div class="dnote" style="margin-top:8px">사업별 정량지표와 산출식은 각 부문 → 세부사업 상세에서 확인할 수 있습니다.</div>`;
-  }
-
   if (key === 'roadmap'){
     html = `
       <h2>🗓️ 단계별 추진 계획 (2026~2030)</h2>
@@ -1109,83 +1103,310 @@ function showCarbonSection(key){
   }
 
   document.getElementById('cpBody').innerHTML = html;
+  document.getElementById('carbonPanel').style.display='block';
+}
 
-  // MRV 계산기 동작 연결 (부문 → 사업 → 산정기준, 다중 항목 합산)
-  if (key === 'mrv'){
-    const cat = CARBON.mrv.catalog;
-    const selS = document.getElementById('calcSec');
-    const selM = document.getElementById('calcMeasure');
-    const selE = document.getElementById('calcEntry');
-    const val  = document.getElementById('calcVal');
-    const unit = document.getElementById('calcUnit');
-    const out  = document.getElementById('calcOut');
-    const listEl = document.getElementById('calcList');
+// ── 감축량 계산기 위젯 (탄소중립계획 원단위 카탈로그 기반) ──
+// MRV 탭에서 사용. cpBody 안에 아래 calcWidgetHTML()을 넣은 뒤 initCalcWidget()으로 동작 연결
+function calcWidgetHTML(m){
+  return `
+    <div class="dsec">감축량 계산기</div>
+    <div class="dnote">${m.catalogNote}<br>부문 → 감축사업 → 산정기준을 선택하고 활동량을 입력한 뒤 [추가]를 누르세요. 여러 사업을 추가하면 합계가 자동 계산됩니다.</div>
+    <div class="calcbox">
+      <select id="calcSec" style="flex:0 0 130px"></select>
+      <select id="calcMeasure"></select>
+    </div>
+    <div class="calcbox">
+      <select id="calcEntry" style="flex:0 0 260px"></select>
+      <input id="calcVal" type="number" min="0" placeholder="활동량 입력">
+      <span id="calcUnit" class="calcunit"></span>
+      <button id="calcBtn">➕ 추가</button>
+    </div>
+    <div id="calcList"></div>
+    <div id="calcOut" class="calcout"></div>
 
-    // 부문 목록 채우기
-    const secs = [...new Set(cat.map(c=>c.section))];
-    selS.innerHTML = secs.map(s=>`<option value="${s}">${s}</option>`).join('');
+    <div class="dsec">노원구 계획 주요 감축원단위</div>
+    <table class="dt">
+      <tr><th style="width:auto">감축수단</th><th style="width:auto">원단위 (tCO₂eq)</th><th style="width:auto">근거</th></tr>
+      ${m.factors.map(f=>`<tr><td>${f.name}</td><td>${f.factor} / ${f.unit}</td><td>${f.note}</td></tr>`).join('')}
+    </table>
+    <div class="dnote" style="margin-top:8px">사업별 정량지표와 산출식은 각 부문 → 세부사업 상세에서 확인할 수 있습니다.</div>`;
+}
+function initCalcWidget(m){
+  const cat = m.catalog;
+  const selS = document.getElementById('calcSec');
+  const selM = document.getElementById('calcMeasure');
+  const selE = document.getElementById('calcEntry');
+  const val  = document.getElementById('calcVal');
+  const unit = document.getElementById('calcUnit');
+  const out  = document.getElementById('calcOut');
+  const listEl = document.getElementById('calcList');
 
-    // 부문 선택 → 사업 목록 갱신
-    function fillMeasures(){
-      const list = cat.filter(c=>c.section===selS.value);
-      selM.innerHTML = list.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
-      fillEntries();
-    }
-    // 사업 선택 → 산정기준(원단위) 목록 갱신
-    function curMeasure(){ return cat.filter(c=>c.section===selS.value)[+selM.value]; }
-    function fillEntries(){
-      const ms = curMeasure();
-      selE.innerHTML = ms.entries.map((e,i)=>
-        `<option value="${i}">${e.label?e.label+' — ':''}${e.value} tCO₂eq/${e.unit}</option>`).join('');
-      updUnit();
-    }
-    function updUnit(){ unit.textContent = curMeasure().entries[+selE.value].unit; }
-    selS.onchange = fillMeasures;
-    selM.onchange = fillEntries;
-    selE.onchange = updUnit;
-    fillMeasures();
+  // 부문 목록 채우기
+  const secs = [...new Set(cat.map(c=>c.section))];
+  selS.innerHTML = secs.map(s=>`<option value="${s}">${s}</option>`).join('');
 
-    // 추가된 계산 항목 목록과 합계
-    if (!window.calcItems) window.calcItems = [];
-    function renderList(){
-      if (!calcItems.length){ listEl.innerHTML=''; out.innerHTML=''; return; }
-      const total = calcItems.reduce((s,it)=>s+it.result,0);
-      listEl.innerHTML = `
-        <table class="dt" style="margin-top:10px">
-          <tr><th style="width:auto">부문</th><th style="width:auto">감축사업 (산정기준)</th>
-              <th style="width:auto">활동량</th><th style="width:auto">원단위</th>
-              <th style="width:auto">감축량 (tCO₂eq)</th><th style="width:34px"></th></tr>
-          ${calcItems.map((it,i)=>`
-            <tr><td>${it.section}</td><td>${it.name}${it.label?` (${it.label})`:''}</td>
-            <td>${it.value.toLocaleString()} ${it.unit}</td><td>${it.factor}</td>
-            <td><b>${it.result.toLocaleString('ko-KR',{maximumFractionDigits:2})}</b></td>
-            <td style="text-align:center"><span class="calcdel" data-i="${i}">✕</span></td></tr>`).join('')}
-        </table>`;
-      out.innerHTML = `
-        <div class="calcres">합계 ${total.toLocaleString('ko-KR',{maximumFractionDigits:2})} <small>tCO₂eq</small></div>
-        <div class="dnote">30년생 소나무 약 ${Math.round(total/0.01459).toLocaleString()}그루의 연간 흡수량에 해당
-        &nbsp;·&nbsp; 승용차 약 ${Math.round(total/2.29).toLocaleString()}대의 연간 배출량에 해당</div>
-        <div class="dnote">※ 산정 결과는 계획 수립용 추정치입니다. 실적 인정을 위해서는 계측 데이터 기반 보고와 제3자 검증 절차가 필요합니다.</div>`;
-      listEl.querySelectorAll('.calcdel').forEach(el=>{
-        el.onclick = ()=>{ calcItems.splice(+el.dataset.i,1); renderList(); };
-      });
-    }
-    renderList();   // 탭 재진입 시 기존 항목 복원
+  // 부문 선택 → 사업 목록 갱신
+  function fillMeasures(){
+    const list = cat.filter(c=>c.section===selS.value);
+    selM.innerHTML = list.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
+    fillEntries();
+  }
+  // 사업 선택 → 산정기준(원단위) 목록 갱신
+  function curMeasure(){ return cat.filter(c=>c.section===selS.value)[+selM.value]; }
+  function fillEntries(){
+    const ms = curMeasure();
+    selE.innerHTML = ms.entries.map((e,i)=>
+      `<option value="${i}">${e.label?e.label+' — ':''}${e.value} tCO₂eq/${e.unit}</option>`).join('');
+    updUnit();
+  }
+  function updUnit(){ unit.textContent = curMeasure().entries[+selE.value].unit; }
+  selS.onchange = fillMeasures;
+  selM.onchange = fillEntries;
+  selE.onchange = updUnit;
+  fillMeasures();
 
-    const add = ()=>{
-      const ms = curMeasure();
-      const e = ms.entries[+selE.value];
-      const v = parseFloat(val.value);
-      if (isNaN(v) || v<=0){ out.innerHTML='<span style="color:#c0392b">활동량을 숫자로 입력해 주세요.</span>'; return; }
-      calcItems.push({section:ms.section, name:ms.name, label:e.label, unit:e.unit,
-                      factor:e.value, value:v, result:v*e.value});
-      val.value='';
-      renderList();
-    };
-    document.getElementById('calcBtn').onclick = add;
-    val.onkeydown = e=>{ if(e.key==='Enter') add(); };
+  // 추가된 계산 항목 목록과 합계
+  if (!window.calcItems) window.calcItems = [];
+  function renderList(){
+    if (!calcItems.length){ listEl.innerHTML=''; out.innerHTML=''; return; }
+    const total = calcItems.reduce((s,it)=>s+it.result,0);
+    listEl.innerHTML = `
+      <table class="dt" style="margin-top:10px">
+        <tr><th style="width:auto">부문</th><th style="width:auto">감축사업 (산정기준)</th>
+            <th style="width:auto">활동량</th><th style="width:auto">원단위</th>
+            <th style="width:auto">감축량 (tCO₂eq)</th><th style="width:34px"></th></tr>
+        ${calcItems.map((it,i)=>`
+          <tr><td>${it.section}</td><td>${it.name}${it.label?` (${it.label})`:''}</td>
+          <td>${it.value.toLocaleString()} ${it.unit}</td><td>${it.factor}</td>
+          <td><b>${it.result.toLocaleString('ko-KR',{maximumFractionDigits:2})}</b></td>
+          <td style="text-align:center"><span class="calcdel" data-i="${i}">✕</span></td></tr>`).join('')}
+      </table>`;
+    out.innerHTML = `
+      <div class="calcres">합계 ${total.toLocaleString('ko-KR',{maximumFractionDigits:2})} <small>tCO₂eq</small></div>
+      <div class="dnote">30년생 소나무 약 ${Math.round(total/0.01459).toLocaleString()}그루의 연간 흡수량에 해당
+      &nbsp;·&nbsp; 승용차 약 ${Math.round(total/2.29).toLocaleString()}대의 연간 배출량에 해당</div>
+      <div class="dnote">※ 산정 결과는 계획 수립용 추정치입니다. 실적 인정을 위해서는 계측 데이터 기반 보고와 제3자 검증 절차가 필요합니다.</div>`;
+    listEl.querySelectorAll('.calcdel').forEach(el=>{
+      el.onclick = ()=>{ calcItems.splice(+el.dataset.i,1); renderList(); };
+    });
+  }
+  renderList();   // 탭 재진입 시 기존 항목 복원
+
+  const add = ()=>{
+    const ms = curMeasure();
+    const e = ms.entries[+selE.value];
+    const v = parseFloat(val.value);
+    if (isNaN(v) || v<=0){ out.innerHTML='<span style="color:#c0392b">활동량을 숫자로 입력해 주세요.</span>'; return; }
+    calcItems.push({section:ms.section, name:ms.name, label:e.label, unit:e.unit,
+                    factor:e.value, value:v, result:v*e.value});
+    val.value='';
+    renderList();
+  };
+  document.getElementById('calcBtn').onclick = add;
+  val.onkeydown = e=>{ if(e.key==='Enter') add(); };
+}
+
+// ══════════════════════════════════════════════════════
+// MRV 시스템 탭
+// 「도시단위 MRV 시스템에 대한 디지털트윈 플랫폼 구성안 계획 수립(Pre-ISP)」
+// (2026.03, 노원구 탄소중립 선도도시 기본계획) 구조를 기반으로 구성.
+// 실측 데이터가 있는 측정·보고 단계는 platform/data.json 집계로 시범 구현하고,
+// VPP·디지털트윈·국가 플랫폼 연계 등 미구축 영역은 계획(안)으로 별도 표기함.
+// ══════════════════════════════════════════════════════
+const ELEC_CO2_FACTOR = 0.0004871;  // tCO₂eq/kWh — 전력배출계수(carbon.json 원단위표와 동일 값)
+const GAS_CO2_FACTOR  = 0.0000561;  // tCO₂eq/MJ — IPCC 기본 도시가스 연소계수(56.1 kgCO₂/GJ) 근사치
+
+// 건물 데이터에서 측정·보고 단계에 쓸 실측 통계를 계산
+function computeMRVStats(){
+  const months = DATA.months;
+  const latest = months[months.length-1];
+  let elecCnt=0, gasCnt=0, coordCnt=0, elecTotal=0, gasTotal=0;
+  const usageElec = {};   // 기준월 용도별 전기 사용량
+  for (const b of DATA.buildings){
+    if (b.elec[latest]!==undefined){ elecCnt++; elecTotal+=b.elec[latest];
+      const u=b.usage||'용도없음'; usageElec[u]=(usageElec[u]||0)+b.elec[latest]; }
+    if (b.gas[latest]!==undefined){ gasCnt++; gasTotal+=b.gas[latest]; }
+    if (coords[b.addr]) coordCnt++;
+  }
+  // 월별 추정 배출량(tCO₂eq) 추이 — 데이터가 있는 모든 월
+  const monthly = months.map(m=>{
+    let e=0, g=0;
+    for (const b of DATA.buildings){ if (b.elec[m]!==undefined) e+=b.elec[m]; if (b.gas[m]!==undefined) g+=b.gas[m]; }
+    return { m, co2: e*ELEC_CO2_FACTOR + g*GAS_CO2_FACTOR };
+  }).filter(x=>x.co2>0);
+  const usageTop = Object.entries(usageElec).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  return {
+    latest, total: DATA.buildings.length, elecCnt, gasCnt, coordCnt,
+    elecTotal, gasTotal, elecCO2: elecTotal*ELEC_CO2_FACTOR, gasCO2: gasTotal*GAS_CO2_FACTOR,
+    monthly, usageTop
+  };
+}
+
+// ── MRV 사이드바: 제목 메뉴만 표시 ────────────────────
+function renderMRVTab(){
+  document.getElementById('tabMRV').innerHTML = `
+    <div class="cm" data-msec="overview">🧮 MRV 시스템 개요</div>
+    <div class="cm" data-msec="measurement">📡 측정(Measurement)</div>
+    <div class="cm" data-msec="reporting">📄 보고(Reporting)</div>
+    <div class="cm" data-msec="verification">✅ 검증(Verification)</div>
+    <div class="cm" data-msec="calculator">🧮 감축량 계산기</div>
+    <div class="sec" style="margin-top:16px">🏙️ 노원구 특화 모델</div>
+    <div class="cm" data-msec="nowon">🏙️ 건물 중심 MRV+VPP 모델</div>
+    <div class="cm" data-msec="roadmap">🗓️ 단계별 구축 로드맵</div>`;
+  document.querySelectorAll('#tabMRV .cm[data-msec]').forEach(el=>{
+    el.onclick = ()=>{ setActiveMenu(el); showMRVSection(el.dataset.msec); };
+  });
+  const first = document.querySelector('#tabMRV .cm');
+  setActiveMenu(first); showMRVSection('overview');
+}
+
+// ── MRV 오른쪽 대시보드 ───────────────────────────────
+function showMRVSection(key){
+  const s = computeMRVStats();
+  const cyr = (label,val,max,color)=>`
+    <div class="cyr"><span class="cl" style="width:70px">${label}</span>
+    <span class="cb" style="width:${Math.max(2,300*val/max)}px${color?`;background:${color}`:''}"></span>
+    <span class="cv">${fmt(Math.round(val))}</span></div>`;
+  let html = '';
+
+  if (key === 'overview'){
+    html = `
+      <h2>🧮 MRV 시스템 개요</h2>
+      <div class="cpsub">Measurement · Reporting · Verification — 「MRV 플랫폼 구성안 계획 수립(Pre-ISP)」(2026.03) 기준</div>
+      <div class="dquote" style="margin-top:12px">${CARBON.mrv.intro}</div>
+      <div class="dgrid3" style="margin-top:14px">
+        ${CARBON.mrv.steps.map(st=>`
+          <div class="dphase">
+            <div class="dpname">${st.k}</div>
+            <div class="dpyear">${st.t}</div>
+            <div style="font-size:12px;color:#334;line-height:1.6">${st.d}</div>
+          </div>`).join('')}
+      </div>
+      <div class="dsec">MRV 5계층 통합 구조 (계획안)</div>
+      <ul class="dul">
+        <li>① 데이터 수집 — IoT 센서·공공DB·API 실시간 수집, DER 출력·제어 이력 수집</li>
+        <li>② 데이터 처리·산정 — IPCC Tier 2/3 산정엔진, Scope1/2/3 관리, 데이터 신뢰등급(A/B/C) 분류</li>
+        <li>③ 디지털트윈 분석 — 배출원 3D 시각화, 정책 시나리오 시뮬레이션(CT Scope)</li>
+        <li>④ 서비스 — 관리자 대시보드·보고서 자동생성, 시민 참여 앱 리워드 정산</li>
+        <li>⑤ 국가 플랫폼 연계 — 국가 온실가스 종합정보센터(GIR) 보고, 감사로그 연동</li>
+      </ul>
+      <div class="dnote">이 탭은 위 계획(안)의 구조를 바탕으로, 현재 확보된 실측 데이터(건물별 전기·가스 월간 사용량)로 측정·보고 단계를 시범 구현했습니다. VPP·디지털트윈 시각화·국가 플랫폼 연계는 계획 단계이며, 아래 "노원구 특화 모델" 탭에서 개념만 소개합니다.</div>`;
   }
 
+  if (key === 'measurement'){
+    html = `
+      <h2>📡 측정(Measurement) 현황</h2>
+      <div class="cpsub">기준월 ${ymLabel(s.latest)} · platform/data.json 건물별 월간 검침 데이터 집계</div>
+      <div class="dash3">
+        <div class="dcard"><div class="dv">${fmt(s.total)}</div><div class="dl">등록 건물(표제부)</div></div>
+        <div class="dcard"><div class="dv">${fmt(s.elecCnt)}</div><div class="dl">전기 데이터 확보 건물</div></div>
+        <div class="dcard"><div class="dv">${fmt(s.gasCnt)}</div><div class="dl">가스 데이터 확보 건물</div></div>
+      </div>
+      <div class="dsec">기준월 활동자료(Activity Data) 및 추정 배출량</div>
+      <table class="dt">
+        <tr><th>구분</th><th>사용량</th><th>배출계수</th><th>추정 배출량</th></tr>
+        <tr><td>전기</td><td>${fmt(s.elecTotal)} kWh</td><td>${ELEC_CO2_FACTOR} tCO₂eq/kWh</td><td>${fmt(Math.round(s.elecCO2))} tCO₂eq</td></tr>
+        <tr><td>가스</td><td>${fmt(s.gasTotal)} MJ</td><td>${GAS_CO2_FACTOR} tCO₂eq/MJ*</td><td>${fmt(Math.round(s.gasCO2))} tCO₂eq</td></tr>
+        <tr><td><b>합계</b></td><td></td><td></td><td><b>${fmt(Math.round(s.elecCO2+s.gasCO2))} tCO₂eq</b></td></tr>
+      </table>
+      <div class="dnote">* 가스 배출계수는 IPCC 기본 도시가스 연소계수(56.1 kgCO₂/GJ)를 근사 적용한 추정치입니다. 공식 인벤토리 산정에는 「지자체 온실가스 감축사업별 감축원단위 적용 가이드라인」 등 공인 계수를 사용해야 합니다.</div>
+      <div class="dsec">데이터 신뢰 등급 (Pre-ISP 계획 3.1.2 기준)</div>
+      <table class="dt">
+        <tr><th>등급</th><th>정의</th><th>현재 플랫폼 적용 현황</th></tr>
+        <tr><td>Grade A</td><td>IoT 실시간 계측 등 정밀 실측 데이터</td><td>미적용 — 제로빌(Zero-Bill) 실시간 연동 예정(계획)</td></tr>
+        <tr><td>Grade B/C</td><td>월별 검침·자진신고 등 참여형 데이터</td><td>✅ 적용 중 — 현재 대시보드의 전기·가스 월간 검침 데이터</td></tr>
+      </table>`;
+  }
+
+  if (key === 'reporting'){
+    const maxCo2 = Math.max(...s.monthly.map(x=>x.co2));
+    const maxUsage = Math.max(...s.usageTop.map(x=>x[1]));
+    const mrvProjects = CARBON.projects.filter(p=>p.mrv);
+    html = `
+      <h2>📄 보고(Reporting)</h2>
+      <div class="cpsub">월별 추정 배출량 추이 및 감축사업 정량지표. 국가 온실가스 종합정보센터(GIR) 서식 자동 업로드는 계획 단계입니다.</div>
+      <div class="dsec">월별 추정 배출량 (tCO₂eq, 전기+가스)</div>
+      ${s.monthly.map(x=>cyr(ymLabel(x.m), x.co2, maxCo2)).join('')}
+      <div class="dsec">기준월(${ymLabel(s.latest)}) 용도별 전기 배출 비중 (상위 6개)</div>
+      ${s.usageTop.map(([name,v])=>cyr(name, v*ELEC_CO2_FACTOR, maxUsage*ELEC_CO2_FACTOR, '#2563eb')).join('')}
+      <div class="dsec">보고 대상 감축사업 (${mrvProjects.length}개) · MRV 정량지표</div>
+      <table class="dt">
+        <tr><th style="width:auto">사업</th><th style="width:90px">MRV 유형</th><th style="width:auto">정량지표</th><th style="width:auto">산출식</th></tr>
+        ${mrvProjects.map(p=>`<tr><td>${p.id}. ${p.name}</td><td>${p.mrv.mrvType}</td>
+          <td>${p.mrv.indicator||'-'}</td><td style="font-size:11px">${p.mrv.formula||'-'}</td></tr>`).join('')}
+      </table>`;
+  }
+
+  if (key === 'verification'){
+    const pct = n => (n/s.total*100).toFixed(1);
+    html = `
+      <h2>✅ 검증(Verification)</h2>
+      <div class="cpsub">Pre-ISP 계획 3.1.1 기준 검증 체계 개념 및 현재 데이터 품질 지표</div>
+      <div class="dgrid3">
+        <div class="dphase"><div class="dpname">데이터 품질 검증</div><div class="dpyear">계획</div>
+          <div style="font-size:12px;color:#334">Completeness·Accuracy·Consistency 자동 점검</div></div>
+        <div class="dphase"><div class="dpname">AI 이상치 탐지</div><div class="dpyear">계획</div>
+          <div style="font-size:12px;color:#334">누락·이상치 자동 탐지 및 보정 요청</div></div>
+        <div class="dphase"><div class="dpname">국가 검증기관 동기화</div><div class="dpyear">계획</div>
+          <div style="font-size:12px;color:#334">GIR API 연동, 감사 추적(ISO 14064) 로그 관리</div></div>
+      </div>
+      <div class="dsec">현재 데이터 완결성 지표 (자체 계산 · 참고용)</div>
+      <div class="dash3">
+        <div class="dcard"><div class="dv">${pct(s.elecCnt)}%</div><div class="dl">전기 데이터 완결성</div></div>
+        <div class="dcard"><div class="dv">${pct(s.gasCnt)}%</div><div class="dl">가스 데이터 완결성</div></div>
+        <div class="dcard"><div class="dv">${pct(s.coordCnt)}%</div><div class="dl">좌표 매칭률</div></div>
+      </div>
+      <div class="dnote">※ 위 지표는 국가 플랫폼 검증이 아닌, 본 플랫폼이 확보한 데이터의 자체 커버리지 지표입니다. 공식 검증은 제3자 검증기관·국가 온실가스 종합정보센터를 통해 별도로 이뤄져야 합니다.</div>`;
+  }
+
+  if (key === 'calculator'){
+    html = `<h2>🧮 감축량 계산기</h2>${calcWidgetHTML(CARBON.mrv)}`;
+  }
+
+  if (key === 'nowon'){
+    html = `
+      <h2>🏙️ 노원구 특화 모델 (설계안)</h2>
+      <div class="cpsub">건물 중심 아키텍처 · 커뮤니티 VPP 및 주민참여형 MRV — Pre-ISP 계획 3.6.1/3.7.3 기준, 구축 예정</div>
+      <div class="dgrid3">
+        <div class="dphase"><div class="dpname">제로빌(Zero-Bill) 플랫폼</div>
+          <div style="font-size:12px;color:#334">공공·민간 건물 에너지 데이터 통합관리, RTU 기반 실시간 모니터링, 건물별 에너지 등급 자동 산정</div></div>
+        <div class="dphase"><div class="dpname">건물 온실가스 총량제</div>
+          <div style="font-size:12px;color:#334">3,000㎡ 이상 건물 배출 총량 제한·등급제(A~E) 실증, 공공 선도 → 민간 확산</div></div>
+        <div class="dphase"><div class="dpname">아파트 커뮤니티 VPP</div>
+          <div style="font-size:12px;color:#334">공동주택 공용 태양광+ESS 통합관리, 단지 내 에너지 공유 최적화, SPC 이익공유 모델</div></div>
+        <div class="dphase"><div class="dpname">V2H 충방전 관리</div>
+          <div style="font-size:12px;color:#334">아파트 주차장 전기차를 가정용 예비전원으로 활용, 가구별 충방전 스케줄링</div></div>
+        <div class="dphase"><div class="dpname">노원형 그린 홈 패키지 MRV</div>
+          <div style="font-size:12px;color:#334">시공 전후 에너지효율 개선 정량 검증(제로빌 연동), 외부사업 배출권 증빙 관리</div></div>
+        <div class="dphase"><div class="dpname">주민 인센티브 게이미피케이션</div>
+          <div style="font-size:12px;color:#334">탄소포인트·지역화폐 연계 자동정산, 지역 랭킹, 탄소중립 도넛 액션 연계</div></div>
+      </div>
+      <div class="dnote">노원구는 전체 주택의 86.6%가 아파트인 주거 밀집 지역으로 건물 부문 배출 비중이 높아, 2030년까지 건물 온실가스 32.8% 감축을 목표로 건물 중심 MRV+VPP 모델을 채택했습니다. (Pre-ISP 계획 기준, 위 6개 컴포넌트는 아직 구축되지 않은 설계안입니다)</div>`;
+  }
+
+  if (key === 'roadmap'){
+    const phases = [
+      { name:'1. 착수', desc:'현황 진단, 데이터 보유·시스템 현황 점검, 사업 범위 확정' },
+      { name:'2. 설계·구축', desc:'MRV 5계층 아키텍처 설계, 데이터 표준·API 정의, 코어 플랫폼 개발' },
+      { name:'3. 시범운영', desc:'노원구 대상 PoC, 제로빌·건물 총량제 실증, 초기 데이터 연동' },
+      { name:'4. 검증', desc:'산정값 품질 검증, 국가 플랫폼(GIR) 연계 테스트, 제3자 검증' },
+      { name:'5. 확산', desc:'전체 건물 확대 적용, 커뮤니티 VPP·주민 인센티브 정식 오픈' },
+    ];
+    html = `
+      <h2>🗓️ 단계별 구축 로드맵 (설계안)</h2>
+      <div class="cpsub">착수 → 설계·구축 → 시범운영 → 검증 → 확산 (Pre-ISP 계획 1.5.5 기준, 세부 일정은 ISP 발주 이후 확정)</div>
+      <div class="dgrid3">
+        ${phases.map(p=>`
+          <div class="dphase">
+            <div class="dpname">${p.name}</div>
+            <div class="dpdesc">${p.desc}</div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  document.getElementById('cpBody').innerHTML = html;
+  if (key === 'calculator') initCalcWidget(CARBON.mrv);
   document.getElementById('carbonPanel').style.display='block';
 }
 
@@ -1412,10 +1633,11 @@ function setMainMap(mode){
 }
 
 btnV.onclick = ()=>{
-  btnV.classList.add('on'); btnE.classList.remove('on'); btnC.classList.remove('on');
+  btnV.classList.add('on'); btnE.classList.remove('on'); btnC.classList.remove('on'); btnM.classList.remove('on');
   document.getElementById('tabEnergy').style.display='none';
   document.getElementById('tabSolar').style.display='block';
   document.getElementById('tabCarbon').style.display='none';
+  document.getElementById('tabMRV').style.display='none';
   document.getElementById('detail').style.display='none';
   document.getElementById('carbonPanel').style.display='none';
   setMainMap('vworld');
