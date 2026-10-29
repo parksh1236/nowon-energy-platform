@@ -419,7 +419,19 @@ const fmt = n => Math.round(n).toLocaleString('ko-KR');
 const ymLabel = ym => ym.slice(0,4) + '.' + ym.slice(4);
 
 // ── 1) 데이터 로드 ─────────────────────────────────────
-fetch('data.json').then(r=>r.json()).then(d=>{
+// 노원구 공공시설(공유재산 목록, public_facilities.json: 주소→시설명[]) 건물은 건물용도를 따로 구분
+const PUBLIC_FACILITY_USAGE = '노원구공공시설';
+Promise.all([
+  fetch('data.json').then(r=>r.json()),
+  fetch('public_facilities.json').then(r=>r.json()).catch(()=>({}))   // 없어도 기존 동작 유지
+]).then(([d, fac])=>{
+  d.buildings.forEach(b=>{
+    if (fac[b.addr]){
+      b.usageOrig = b.usage;                    // 원래 용도 보존
+      b.usage = PUBLIC_FACILITY_USAGE;
+      b.facilities = fac[b.addr];               // 해당 필지의 공공시설명
+    }
+  });
   DATA = d;
   state.month = d.months[d.months.length-1];   // 최신 월 기본 선택
   buildMonthButtons();
@@ -926,7 +938,8 @@ function showDetail(b){
   document.getElementById('dbody').innerHTML = `
     <h2>${b.name?b.name+' — ':''}${b.addr}</h2>
     ${b.road?`<div class="road">${b.road}</div>`:''}
-    ${b.usage?`<span class="tag">${b.usage}</span>`:'<span class="tag" style="background:#eee;color:#888">용도정보 없음</span>'}
+    ${b.usage?`<span class="tag"${b.facilities?' style="background:#fde7c8;color:#9a5300"':''}>${b.usage}</span>`:'<span class="tag" style="background:#eee;color:#888">용도정보 없음</span>'}
+    ${b.facilities?`<div class="meta">공공시설: ${b.facilities.join(', ')}${b.usageOrig?` <span style="color:#889">(원 용도: ${b.usageOrig})</span>`:''}</div>`:''}
     ${c?`<a class="tag" style="background:#0b8a5f;color:#fff;cursor:pointer;text-decoration:none" target="_blank"
         href="https://map.kakao.com/link/to/${encodeURIComponent(b.name||b.addr)},${c.lat},${c.lng}">🚗 카카오맵 길찾기</a>
         <span class="tag" id="routeBtn" style="background:#2563eb;color:#fff;cursor:pointer">🗺️ 지도에 경로 표시</span>
