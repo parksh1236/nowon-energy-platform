@@ -307,6 +307,7 @@
     <div id="stats"></div>
     <div style="padding:8px 18px; border-top:1px solid rgba(255,255,255,.12)">
       <button id="exportCoords" class="mini" style="float:none">📥 좌표 캐시 내보내기 (coords.json)</button>
+      <button id="exportPublicGas" class="mini" style="float:none;margin-top:6px">📥 공공시설 가스사용량 내려받기 (엑셀용 CSV)</button>
     </div>
     </div><!-- /tabEnergy -->
     <div id="tabSolar" style="display:none">
@@ -1875,6 +1876,28 @@ document.getElementById('exportCoords').onclick = ()=>{
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'coords.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+// 노원구공공시설 중 가스 데이터가 있는 건물의 월별 가스사용량(MJ)을 엑셀에서 바로 열리는 CSV(UTF-8 BOM)로 내려받기
+document.getElementById('exportPublicGas').onclick = ()=>{
+  if (!DATA){ alert('데이터를 불러오는 중입니다. 잠시 후 다시 눌러주세요.'); return; }
+  const esc = v => `"${String(v==null?'':v).replace(/"/g,'""')}"`;
+  const months = DATA.months;
+  const rows = DATA.buildings.filter(b=>b.facilities && months.some(m=>b.gas[m]!==undefined));
+  const sumY = (b,y)=>months.filter(m=>m.startsWith(y) && b.gas[m]!==undefined).reduce((s,m)=>s+b.gas[m],0);
+  const head = ['지번','공공시설명','원 건물용도', ...months.map(m=>`${ymLabel(m)}(MJ)`), '2025년 합계(MJ)', '2026년 누계(MJ)'];
+  const lines = [head.map(esc).join(',')];
+  rows.forEach(b=>{
+    lines.push([b.addr, b.facilities.join(' / '), b.usageOrig||'',
+      ...months.map(m=>b.gas[m]!==undefined?Math.round(b.gas[m]):''),
+      Math.round(sumY(b,'2025')), Math.round(sumY(b,'2026'))].map(esc).join(','));
+  });
+  const blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `노원구공공시설_가스사용량_${months[months.length-1]}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
 };
